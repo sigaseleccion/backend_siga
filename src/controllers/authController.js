@@ -1,0 +1,64 @@
+const Usuario = require('../models/Usuario');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+// Login
+const login = async (req, res) => {
+  try {
+    const { correo, contrasena } = req.body;
+
+    // Buscar usuario
+    const usuario = await Usuario.findOne({ correo }).populate('rol');
+    if (!usuario) {
+      return res.status(401).json({ message: 'Credenciales inválidas' });
+    }
+
+    // Verificar si el usuario está activo
+    if (!usuario.activo) {
+      return res.status(401).json({ message: 'Usuario desactivado' });
+    }
+
+    // Verificar contraseña
+    const contrasenaValida = await bcrypt.compare(contrasena, usuario.contrasena);
+    if (!contrasenaValida) {
+      return res.status(401).json({ message: 'Credenciales inválidas' });
+    }
+
+    // Generar token
+    const token = jwt.sign(
+      { id: usuario._id, correo: usuario.correo, rol: usuario.rol },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+    );
+
+    res.json({
+      message: 'Login exitoso',
+      token,
+      usuario: {
+        id: usuario._id,
+        nombre: usuario.nombre,
+        correo: usuario.correo,
+        rol: usuario.rol
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error en el login', error: error.message });
+  }
+};
+
+// Verificar token
+const verificarToken = async (req, res) => {
+  try {
+    const usuario = await Usuario.findById(req.usuario.id)
+      .select('-contrasena')
+      .populate('rol');
+    res.json(usuario);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al verificar token', error: error.message });
+  }
+};
+
+module.exports = {
+  login,
+  verificarToken
+};
