@@ -5,6 +5,8 @@ const router = express.Router();
 const routeAuth = require('./routeAuth');
 const routeUsuario = require('./routeUsuario');
 const routeRol = require('./routeRol');
+const routePrivilegio = require('./routePrivilegio')
+const routePermiso = require('./routePermiso')
 const routeConvocatoria = require('./routeConvocatoria');
 const routeAprendiz = require('./routeAprendiz');
 const routePruebaSeleccion = require('./routePruebaSeleccion');
@@ -16,6 +18,8 @@ const routeCuotaAprendiz = require('./routeCuotaAprendiz');
 router.use('/auth', routeAuth);
 router.use('/usuarios', routeUsuario);
 router.use('/roles', routeRol);
+router.use('/privilegios', routePrivilegio)
+router.use('/permisos', routePermiso)
 router.use('/convocatorias', routeConvocatoria);
 router.use('/aprendices', routeAprendiz);
 router.use('/pruebas-seleccion', routePruebaSeleccion);

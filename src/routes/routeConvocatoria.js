@@ -8,5 +8,6 @@ router.get('/:id', verificarToken, convocatoriaController.obtenerConvocatoriaPor
 router.post('/', verificarToken, convocatoriaController.crearConvocatoria);
 router.put('/:id', verificarToken, convocatoriaController.actualizarConvocatoria);
 router.patch('/:id/archivar', verificarToken, convocatoriaController.archivarConvocatoria);
+//falta el cargar excel adicional
 
 module.exports = router;

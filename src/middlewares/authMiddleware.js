@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const Usuario = require('../models/Usuario');
 
 const verificarToken = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -17,19 +18,46 @@ const verificarToken = (req, res, next) => {
 };
 
 // Middleware para verificar permisos específicos
-const verificarPermiso = (modulo, accion) => {
-  return (req, res, next) => {
-    const permisos = req.usuario?.rol?.permisos;
-    
-    if (!permisos || !permisos[modulo] || !permisos[modulo][accion]) {
-      return res.status(403).json({ message: 'No tienes permiso para realizar esta acción' });
+const autorizar = (modulo, accion) => {
+  return async (req, res, next) => {
+    try {
+      const usuario = await Usuario.findById(req.usuario.id)
+        .populate({
+          path: 'rol',
+          populate: {
+            path: 'permisos.permiso permisos.privilegiosAsignados'
+          }
+        });
+
+      if (!usuario || !usuario.rol || !usuario.rol.activo) {
+        return res.status(403).json({ mensaje: 'Rol no válido' });
+      }
+
+      const permisoEncontrado = usuario.rol.permisos.find(
+        p => p.permiso.modulo === modulo
+      );
+
+      if (!permisoEncontrado) {
+        return res.status(403).json({ mensaje: 'Sin acceso al módulo' });
+      }
+
+      const tienePrivilegio = permisoEncontrado.privilegiosAsignados.some(
+        priv => priv.clave === accion
+      );
+
+      if (!tienePrivilegio) {
+        return res.status(403).json({ mensaje: 'Acción no permitida' });
+      }
+
+      next();
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ mensaje: 'Error de autorización' });
     }
-    
-    next();
   };
 };
 
 module.exports = {
   verificarToken,
-  verificarPermiso
+  autorizar
 };

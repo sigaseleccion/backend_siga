@@ -1,69 +1,111 @@
 const Rol = require('../models/Rol');
 
-// Obtener todos los roles
-const obtenerRoles = async (req, res) => {
-  try {
-    const roles = await Rol.find();
-    res.json(roles);
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener roles', error: error.message });
-  }
-};
-
-// Obtener rol por ID
-const obtenerRolPorId = async (req, res) => {
-  try {
-    const rol = await Rol.findById(req.params.id);
-    if (!rol) {
-      return res.status(404).json({ message: 'Rol no encontrado' });
-    }
-    res.json(rol);
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener rol', error: error.message });
-  }
-};
-
-// Crear rol
 const crearRol = async (req, res) => {
   try {
-    const nuevoRol = new Rol(req.body);
-    await nuevoRol.save();
-    res.status(201).json({ message: 'Rol creado exitosamente', rol: nuevoRol });
+    const { nombre, descripcion, permisos } = req.body;
+
+    const existe = await Rol.findOne({ nombre });
+    if (existe) {
+      return res.status(400).json({ mensaje: 'El rol ya existe' });
+    }
+
+    const rol = await Rol.create({
+      nombre,
+      descripcion,
+      permisos
+    });
+
+    res.status(201).json(rol);
   } catch (error) {
-    res.status(500).json({ message: 'Error al crear rol', error: error.message });
+    res.status(500).json({ mensaje: 'Error al crear rol' });
   }
 };
 
-// Actualizar rol
+const listarRoles = async (req, res) => {
+  try {
+    const roles = await Rol.find()
+      .populate({
+        path: 'permisos.permiso',
+        select: 'modulo'
+      })
+      .populate('permisos.privilegiosAsignados')
+      .sort({ nombre: 1 });
+
+    res.json(roles);
+  } catch (error) {
+    res.status(500).json({ mensaje: 'Error al listar roles' });
+  }
+};
+
+
+const obtenerRolPorId = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const rol = await Rol.findById(id)
+      .populate({
+        path: 'permisos.permiso',
+        populate: { path: 'privilegiosDisponibles' }
+      })
+      .populate('permisos.privilegiosAsignados')
+      .sort({ nombre: 1 });
+
+    if (!rol) {
+      return res.status(404).json({ mensaje: 'Rol no encontrado' });
+    }
+
+    res.json(rol);
+  } catch (error) {
+    res.status(500).json({ mensaje: 'Error al obtener rol' });
+  }
+};
+
 const actualizarRol = async (req, res) => {
   try {
-    const rol = await Rol.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const { id } = req.params;
+    const { nombre, descripcion, permisos, activo } = req.body;
+
+    const rol = await Rol.findByIdAndUpdate(
+      id,
+      { nombre, descripcion, permisos, activo },
+      { new: true }
+    );
+
     if (!rol) {
-      return res.status(404).json({ message: 'Rol no encontrado' });
+      return res.status(404).json({ mensaje: 'Rol no encontrado' });
     }
-    res.json({ message: 'Rol actualizado', rol });
+
+    res.json(rol);
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar rol', error: error.message });
+    res.status(500).json({ mensaje: 'Error al actualizar rol' });
   }
 };
 
-// Eliminar rol
 const eliminarRol = async (req, res) => {
   try {
-    const rol = await Rol.findByIdAndUpdate(req.params.id, { activo: false }, { new: true });
+    const { id } = req.params;
+
+    const rol = await Rol.findByIdAndUpdate(
+      id,
+      { activo: false },
+      { new: true }
+    );
+
     if (!rol) {
-      return res.status(404).json({ message: 'Rol no encontrado' });
+      return res.status(404).json({ mensaje: 'Rol no encontrado' });
     }
-    res.json({ message: 'Rol desactivado exitosamente' });
+
+    res.json({ mensaje: 'Rol desactivado correctamente' });
   } catch (error) {
-    res.status(500).json({ message: 'Error al eliminar rol', error: error.message });
+    res.status(500).json({ mensaje: 'Error al eliminar rol' });
   }
 };
 
 module.exports = {
-  obtenerRoles,
-  obtenerRolPorId,
   crearRol,
+  listarRoles,
+  obtenerRolPorId,
   actualizarRol,
   eliminarRol
 };
+

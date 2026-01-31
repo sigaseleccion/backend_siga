@@ -1,0 +1,170 @@
+[
+  {
+    "_id": "697d39ad3a22d7d2af586acf",
+    "modulo": "convocatorias",
+    "privilegiosDisponibles": [
+      {
+        "_id": "697d39ab3a22d7d2af586ab6",
+        "clave": "ver",
+        "etiqueta": "Ver",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ab3a22d7d2af586aba",
+        "clave": "crear",
+        "etiqueta": "Crear",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ac3a22d7d2af586abd",
+        "clave": "editar",
+        "etiqueta": "Editar",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ac3a22d7d2af586ac0",
+        "clave": "cargarExcelAdicional",
+        "etiqueta": "Cargar Excel Adicional",
+        "__v": 0
+      }
+    ],
+    "__v": 0
+  },
+  {
+    "_id": "697d39ac3a22d7d2af586acc",
+    "modulo": "dashboard",
+    "privilegiosDisponibles": [
+      {
+        "_id": "697d39ab3a22d7d2af586ab6",
+        "clave": "ver",
+        "etiqueta": "Ver",
+        "__v": 0
+      }
+    ],
+    "__v": 0
+  },
+  {
+    "_id": "697d39ad3a22d7d2af586ad8",
+    "modulo": "roles",
+    "privilegiosDisponibles": [
+      {
+        "_id": "697d39ab3a22d7d2af586ab6",
+        "clave": "ver",
+        "etiqueta": "Ver",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ab3a22d7d2af586aba",
+        "clave": "crear",
+        "etiqueta": "Crear",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ac3a22d7d2af586abd",
+        "clave": "editar",
+        "etiqueta": "Editar",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ac3a22d7d2af586ac9",
+        "clave": "eliminar",
+        "etiqueta": "Eliminar",
+        "__v": 0
+      }
+    ],
+    "__v": 0
+  },
+  {
+    "_id": "697d39ad3a22d7d2af586ad5",
+    "modulo": "seguimiento",
+    "privilegiosDisponibles": [
+      {
+        "_id": "697d39ab3a22d7d2af586ab6",
+        "clave": "ver",
+        "etiqueta": "Ver",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ab3a22d7d2af586aba",
+        "clave": "crear",
+        "etiqueta": "Crear",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ac3a22d7d2af586abd",
+        "clave": "editar",
+        "etiqueta": "Editar",
+        "__v": 0
+      }
+    ],
+    "__v": 0
+  },
+  {
+    "_id": "697d39ad3a22d7d2af586ad2",
+    "modulo": "seleccion",
+    "privilegiosDisponibles": [
+      {
+        "_id": "697d39ab3a22d7d2af586ab6",
+        "clave": "ver",
+        "etiqueta": "Ver",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ab3a22d7d2af586aba",
+        "clave": "crear",
+        "etiqueta": "Crear",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ac3a22d7d2af586abd",
+        "clave": "editar",
+        "etiqueta": "Editar",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ac3a22d7d2af586ac3",
+        "clave": "gestionReporteTecnico",
+        "etiqueta": "Gestion Reporte Tecnico",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ac3a22d7d2af586ac6",
+        "clave": "gestionArchivado",
+        "etiqueta": "Gestion Archivado",
+        "__v": 0
+      }
+    ],
+    "__v": 0
+  },
+  {
+    "_id": "697d39ad3a22d7d2af586adb",
+    "modulo": "usuarios",
+    "privilegiosDisponibles": [
+      {
+        "_id": "697d39ab3a22d7d2af586ab6",
+        "clave": "ver",
+        "etiqueta": "Ver",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ab3a22d7d2af586aba",
+        "clave": "crear",
+        "etiqueta": "Crear",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ac3a22d7d2af586abd",
+        "clave": "editar",
+        "etiqueta": "Editar",
+        "__v": 0
+      },
+      {
+        "_id": "697d39ac3a22d7d2af586ac9",
+        "clave": "eliminar",
+        "etiqueta": "Eliminar",
+        "__v": 0
+      }
+    ],
+    "__v": 0
+  }
+]

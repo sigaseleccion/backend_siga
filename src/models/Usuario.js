@@ -6,16 +6,6 @@ const usuarioSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  tipoDocumento: {
-    type: String,
-    required: true,
-    enum: ['CC', 'CE', 'TI', 'PP']
-  },
-  documento: {
-    type: String,
-    required: true,
-    unique: true
-  },
   correo: {
     type: String,
     required: true,

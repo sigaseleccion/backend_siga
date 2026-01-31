@@ -1,5 +1,7 @@
 const Usuario = require('./Usuario');
 const Rol = require('./Rol');
+const Permiso = require('./Permiso');
+const Privilegio = require('./Privilegio');
 const Convocatoria = require('./Convocatoria');
 const Aprendiz = require('./Aprendiz');
 const PruebaSeleccion = require('./PruebaSeleccion');
@@ -10,6 +12,8 @@ const CuotaAprendiz = require('./CuotaAprendiz');
 module.exports = {
   Usuario,
   Rol,
+  Permiso,
+  Privilegio,
   Convocatoria,
   Aprendiz,
   PruebaSeleccion,

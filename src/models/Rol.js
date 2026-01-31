@@ -1,54 +1,25 @@
 const mongoose = require('mongoose');
 
-const rolSchema = new mongoose.Schema({
+const RolSchema = new mongoose.Schema({
   nombre: {
     type: String,
     required: true,
-    unique: true,
-    trim: true
+    unique: true
   },
-  descripcion: {
-    type: String,
-    trim: true
-  },
-  permisos: {
-    convocatorias: {
-      ver: { type: Boolean, default: false },
-      crear: { type: Boolean, default: false },
-      editar: { type: Boolean, default: false },
-      cargarExcelAdicional: { type: Boolean, default: false }
+  permisos: [{
+    permiso: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Permiso"
     },
-    seleccion: {
-      ver: { type: Boolean, default: false },
-      crear: { type: Boolean, default: false },
-      editar: { type: Boolean, default: false },
-      gestionReporteTecnico: { type: Boolean, default: false }
-    },
-    seguimiento: {
-      ver: { type: Boolean, default: false },
-      crear: { type: Boolean, default: false },
-      editar: { type: Boolean, default: false }
-    },
-    roles: {
-      ver: { type: Boolean, default: false },
-      crear: { type: Boolean, default: false },
-      editar: { type: Boolean, default: false }
-    },
-    historial: {
-      ver: { type: Boolean, default: false },
-      crear: { type: Boolean, default: false },
-      editar: { type: Boolean, default: false }
-    },
-    usuarios: {
-      ver: { type: Boolean, default: false },
-      crear: { type: Boolean, default: false },
-      editar: { type: Boolean, default: false }
-    }
-  },
+    privilegiosAsignados: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Privilegio"
+    }]
+  }],
   activo: {
     type: Boolean,
     default: true
   }
 });
 
-module.exports = mongoose.model('Rol', rolSchema);
+module.exports = mongoose.model("Rol", RolSchema);

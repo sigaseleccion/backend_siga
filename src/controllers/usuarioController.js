@@ -4,10 +4,29 @@ const bcrypt = require('bcryptjs');
 // Obtener todos los usuarios
 const obtenerUsuarios = async (req, res) => {
   try {
-    const usuarios = await Usuario.find().populate('rol').select('-contrasena');
+    const usuarios = await Usuario.find()
+      .select('-contrasena')
+      .populate({
+        path: 'rol',
+        select: 'nombre permisos activo',
+        populate: [
+          {
+            path: 'permisos.permiso',
+            select: 'modulo'
+          },
+          {
+            path: 'permisos.privilegiosAsignados',
+            select: 'clave etiqueta'
+          }
+        ]
+      });
+
     res.json(usuarios);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener usuarios', error: error.message });
+    res.status(500).json({
+      message: 'Error al obtener usuarios',
+      error: error.message
+    });
   }
 };
 
@@ -27,10 +46,10 @@ const obtenerUsuarioPorId = async (req, res) => {
 // Crear usuario
 const crearUsuario = async (req, res) => {
   try {
-    const { nombre, tipoDocumento, documento, correo, contrasena, rol } = req.body;
+    const { nombre, correo, contrasena, rol } = req.body;
     
     // Verificar si el usuario ya existe
-    const usuarioExistente = await Usuario.findOne({ $or: [{ correo }, { documento }] });
+    const usuarioExistente = await Usuario.findOne({ $or: [{ correo }] });
     if (usuarioExistente) {
       return res.status(400).json({ message: 'El usuario ya existe' });
     }
@@ -41,8 +60,6 @@ const crearUsuario = async (req, res) => {
 
     const nuevoUsuario = new Usuario({
       nombre,
-      tipoDocumento,
-      documento,
       correo,
       contrasena: contrasenaHash,
       rol
