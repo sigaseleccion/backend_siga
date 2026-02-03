@@ -72,8 +72,8 @@ const aprendizSchema = new mongoose.Schema({
   }],
   etapaActual: {
     type: String,
-    enum: ['lectiva', 'productiva', 'finalizado'],
-    default: 'lectiva'
+    enum: ['seleccion1', 'seleccion2', 'lectiva', 'productiva', 'finalizado'],
+    default: 'seleccion1'
   }
 });
 
