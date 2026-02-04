@@ -3,11 +3,11 @@ const router = express.Router();
 const historialAprendizController = require('../controllers/historialAprendizController');
 const { verificarToken } = require('../middlewares/authMiddleware');
 
-router.get('/', verificarToken, historialAprendizController.obtenerHistorial);
-router.get('/:id', verificarToken, historialAprendizController.obtenerHistorialPorId);
-router.get('/aprendiz/:aprendizId', verificarToken, historialAprendizController.obtenerHistorialPorAprendiz);
-router.post('/', verificarToken, historialAprendizController.crearHistorial);
-router.put('/:id', verificarToken, historialAprendizController.actualizarHistorial);
-router.delete('/:id', verificarToken, historialAprendizController.eliminarHistorial);
+router.get('/',  historialAprendizController.obtenerHistorial);
+router.get('/:id',  historialAprendizController.obtenerHistorialPorId);
+router.get('/aprendiz/:aprendizId',  historialAprendizController.obtenerHistorialPorAprendiz);
+router.post('/',  historialAprendizController.crearHistorial);
+router.put('/:id',  historialAprendizController.actualizarHistorial);
+router.delete('/:id',  historialAprendizController.eliminarHistorial);
 
 module.exports = router;

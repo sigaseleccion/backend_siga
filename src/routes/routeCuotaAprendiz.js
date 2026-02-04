@@ -3,8 +3,8 @@ const router = express.Router();
 const cuotaAprendizController = require('../controllers/cuotaAprendizController');
 const { verificarToken } = require('../middlewares/authMiddleware');
 
-router.get('/', verificarToken, cuotaAprendizController.obtenerCuota);
-router.get('/historial', verificarToken, cuotaAprendizController.obtenerHistorialCuotas);
-router.post('/', verificarToken, cuotaAprendizController.actualizarCuota);
+router.get('/', cuotaAprendizController.obtenerCuota);
+router.get('/historial', cuotaAprendizController.obtenerHistorialCuotas);
+router.post('/', cuotaAprendizController.actualizarCuota);
 
 module.exports = router;
