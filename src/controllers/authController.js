@@ -7,47 +7,63 @@ const login = async (req, res) => {
   try {
     const { correo, contrasena } = req.body;
 
-    // Buscar usuario
-    const usuario = await Usuario.findOne({ correo }).populate("rol");
+    const usuario = await Usuario.findOne({ correo })
+      .populate({
+        path: 'rol',
+        populate: [
+          {
+            path: 'permisos.permiso',
+            select: 'modulo'
+          },
+          {
+            path: 'permisos.privilegiosAsignados',
+            select: 'clave etiqueta'
+          }
+        ]
+      });
+
     if (!usuario) {
-      return res.status(401).json({ message: "Credenciales inválidas" });
+      return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
-    // Verificar si el usuario está activo
     if (!usuario.activo) {
-      return res.status(401).json({ message: "Usuario desactivado" });
+      return res.status(401).json({ message: 'Usuario desactivado' });
     }
 
-    // Verificar contraseña
     const contrasenaValida = await bcrypt.compare(
       contrasena,
-      usuario.contrasena,
+      usuario.contrasena
     );
+
     if (!contrasenaValida) {
-      return res.status(401).json({ message: "Credenciales inválidas" });
+      return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
-    // Generar token
-    const token = jwt.sign({ id: usuario._id }, process.env.JWT_SECRET, {
-      expiresIn: "24h",
-    });
+    const token = jwt.sign(
+      { id: usuario._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
 
     res.json({
-      message: "Login exitoso",
+      message: 'Login exitoso',
       token,
       usuario: {
         id: usuario._id,
         nombre: usuario.nombre,
         correo: usuario.correo,
-        rol: usuario.rol,
-      },
+        rol: usuario.rol
+      }
     });
+
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error en el login", error: error.message });
+    res.status(500).json({
+      message: 'Error en el login',
+      error: error.message
+    });
   }
 };
+
 
 // Verificar token
 const verificarToken = async (req, res) => {
