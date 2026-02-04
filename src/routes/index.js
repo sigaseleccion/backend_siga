@@ -13,6 +13,7 @@ const routePruebaSeleccion = require('./routePruebaSeleccion');
 const routeReporteTecnico = require('./routeReporteTecnico');
 const routeHistorialAprendiz = require('./routeHistorialAprendiz');
 const routeCuotaAprendiz = require('./routeCuotaAprendiz');
+const routeSeguimiento = require('./routeSeguimiento');
 
 // Usar rutas
 router.use('/auth', routeAuth);
@@ -26,5 +27,6 @@ router.use('/pruebas-seleccion', routePruebaSeleccion);
 router.use('/reportes-tecnicos', routeReporteTecnico);
 router.use('/historial-aprendices', routeHistorialAprendiz);
 router.use('/cuota-aprendices', routeCuotaAprendiz);
+router.use('/seguimiento', routeSeguimiento);
 
 module.exports = router;

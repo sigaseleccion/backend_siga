@@ -1,4 +1,5 @@
 const PruebaSeleccion = require('../models/PruebaSeleccion');
+const Aprendiz = require('../models/Aprendiz');
 
 // Obtener todas las pruebas
 const obtenerPruebas = async (req, res) => {
@@ -27,11 +28,24 @@ const obtenerPruebaPorId = async (req, res) => {
   }
 };
 
-// Crear prueba
+// Crear prueba (con validación de duplicados por aprendiz y convocatoria)
 const crearPrueba = async (req, res) => {
   try {
-    const nuevaPrueba = new PruebaSeleccion(req.body);
+    const { aprendizId, convocatoriaId } = req.body;
+    if (!aprendizId || !convocatoriaId) {
+      return res.status(400).json({ message: 'aprendizId y convocatoriaId son requeridos' });
+    }
+    const existente = await PruebaSeleccion.findOne({ aprendizId, convocatoriaId });
+    if (existente) {
+      await Aprendiz.findByIdAndUpdate(aprendizId, { pruebaSeleccionId: existente._id });
+      return res.status(200).json({ message: 'Ya existe una prueba asociada', prueba: existente });
+    }
+    const nuevaPrueba = new PruebaSeleccion({
+      aprendizId,
+      convocatoriaId,
+    });
     await nuevaPrueba.save();
+    await Aprendiz.findByIdAndUpdate(aprendizId, { pruebaSeleccionId: nuevaPrueba._id });
     res.status(201).json({ message: 'Prueba creada exitosamente', prueba: nuevaPrueba });
   } catch (error) {
     res.status(500).json({ message: 'Error al crear prueba', error: error.message });

@@ -70,11 +70,21 @@ const aprendizSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Aprendiz'
   }],
+  pruebaSeleccionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PruebaSeleccion'
+  },
   etapaActual: {
     type: String,
     enum: ['seleccion1', 'seleccion2', 'lectiva', 'productiva', 'finalizado'],
     default: 'seleccion1'
+  },
+  reemplazoId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Aprendiz',
+    default: null
   }
+
 });
 
 module.exports = mongoose.model('Aprendiz', aprendizSchema);
