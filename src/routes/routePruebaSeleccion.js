@@ -6,7 +6,7 @@ const { verificarToken } = require('../middlewares/authMiddleware');
 router.get('/', verificarToken, pruebaSeleccionController.obtenerPruebas);
 router.get('/:id', verificarToken, pruebaSeleccionController.obtenerPruebaPorId);
 router.get('/aprendiz/:aprendizId', verificarToken, pruebaSeleccionController.obtenerPruebasPorAprendiz);
-router.post('/', verificarToken, pruebaSeleccionController.crearPrueba);
+router.post('/', pruebaSeleccionController.crearPrueba);
 router.put('/:id', verificarToken, pruebaSeleccionController.actualizarPrueba);
 router.delete('/:id', verificarToken, pruebaSeleccionController.eliminarPrueba);
 
