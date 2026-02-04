@@ -36,6 +36,10 @@ const historialAprendizSchema = new mongoose.Schema({
   fechaFinContrato: {
     type: Date
   },
+  convocatoriaId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Convocatoria'
+    },
   fechaFinalizacion: {
     type: Date,
     default: Date.now

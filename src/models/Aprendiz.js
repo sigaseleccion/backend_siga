@@ -74,7 +74,13 @@ const aprendizSchema = new mongoose.Schema({
     type: String,
     enum: ['lectiva', 'productiva', 'finalizado'],
     default: 'lectiva'
+  },
+  reemplazoId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Aprendiz',
+    default: null
   }
+  
 });
 
 module.exports = mongoose.model('Aprendiz', aprendizSchema);
