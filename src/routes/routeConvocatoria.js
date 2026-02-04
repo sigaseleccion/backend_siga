@@ -3,11 +3,15 @@ const router = express.Router();
 const convocatoriaController = require('../controllers/convocatoriaController');
 const { verificarToken } = require('../middlewares/authMiddleware');
 
-router.get('/', verificarToken, convocatoriaController.obtenerConvocatorias);
-router.get('/:id', verificarToken, convocatoriaController.obtenerConvocatoriaPorId);
-router.post('/', verificarToken, convocatoriaController.crearConvocatoria);
-router.put('/:id', verificarToken, convocatoriaController.actualizarConvocatoria);
-router.patch('/:id/archivar', verificarToken, convocatoriaController.archivarConvocatoria);
-//falta el cargar excel adicional
+// Rutas de convocatorias
+router.get('/', /*verificarToken*/  convocatoriaController.obtenerConvocatorias);
+router.get('/:id', /*verificarToken*/  convocatoriaController.obtenerConvocatoriaPorId);
+router.post('/', /*verificarToken*/  convocatoriaController.crearConvocatoria);
+router.post('/crear-con-aprendices', /*verificarToken*/  convocatoriaController.crearConvocatoriaConAprendices);
+router.post('/:id/cargar-excel-adicional', /*verificarToken*/  convocatoriaController.cargarExcelAdicional);
+router.put('/:id', /*verificarToken*/  convocatoriaController.actualizarConvocatoria);
+router.patch('/:id/cerrar', /*verificarToken*/  convocatoriaController.cerrarConvocatoria);
+router.patch('/:id/reabrir', /*verificarToken*/  convocatoriaController.reabrirConvocatoria);
+router.patch('/:id/archivar', /*verificarToken*/  convocatoriaController.archivarConvocatoria);
 
 module.exports = router;
