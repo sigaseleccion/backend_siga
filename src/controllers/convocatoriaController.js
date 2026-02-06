@@ -88,6 +88,15 @@ const obtenerConvocatorias = async (req, res) => {
   }
 };
 
+const obtenerConvocatoriasArchivadas = async (req, res) => {
+  try {
+    const convocatorias = await Convocatoria.find({ archivada: true }).sort({ fechaArchivado: -1 });
+    res.json(convocatorias);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener convocatorias archivadas', error: error.message });
+  }
+};
+
 // Obtener convocatoria por ID
 const obtenerConvocatoriaPorId = async (req, res) => {
   try {
@@ -375,6 +384,7 @@ const archivarConvocatoria = async (req, res) => {
 
 module.exports = {
   obtenerConvocatorias,
+  obtenerConvocatoriasArchivadas,
   obtenerConvocatoriaPorId,
   crearConvocatoria,
   crearConvocatoriaConAprendices,

@@ -5,6 +5,7 @@ const { verificarToken } = require('../middlewares/authMiddleware');
 
 // Rutas de convocatorias
 router.get('/', /*verificarToken*/  convocatoriaController.obtenerConvocatorias);
+router.get('/archivadas', /*verificarToken*/  convocatoriaController.obtenerConvocatoriasArchivadas);
 router.get('/:id', /*verificarToken*/  convocatoriaController.obtenerConvocatoriaPorId);
 router.post('/', /*verificarToken*/  convocatoriaController.crearConvocatoria);
 router.post('/crear-con-aprendices', /*verificarToken*/  convocatoriaController.crearConvocatoriaConAprendices);
