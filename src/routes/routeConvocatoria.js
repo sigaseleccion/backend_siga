@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const convocatoriaController = require('../controllers/convocatoriaController');
 const { verificarToken } = require('../middlewares/authMiddleware');
+const { upload } = require('../middlewares/upload');
 
 // Rutas de convocatorias
 router.get('/', /*verificarToken*/  convocatoriaController.obtenerConvocatorias);
@@ -14,5 +15,6 @@ router.put('/:id', /*verificarToken*/  convocatoriaController.actualizarConvocat
 router.patch('/:id/cerrar', /*verificarToken*/  convocatoriaController.cerrarConvocatoria);
 router.patch('/:id/reabrir', /*verificarToken*/  convocatoriaController.reabrirConvocatoria);
 router.patch('/:id/archivar', /*verificarToken*/  convocatoriaController.archivarConvocatoria);
+router.post('/:convocatoriaId/reporte', /*verificarToken*/ upload.single('file'), convocatoriaController.subirReporteTecnico);
 
 module.exports = router;

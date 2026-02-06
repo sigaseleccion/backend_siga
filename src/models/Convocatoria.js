@@ -42,6 +42,12 @@ const convocatoriaSchema = new mongoose.Schema({
   fechaArchivado: {
     type: Date
   }
+  ,
+  reporteTecnico: {
+    url: { type: String },
+    publicId: { type: String },
+    uploadedAt: { type: Date }
+  }
 });
 
 module.exports = mongoose.model('Convocatoria', convocatoriaSchema);

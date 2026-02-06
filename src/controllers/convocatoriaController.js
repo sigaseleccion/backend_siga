@@ -110,6 +110,46 @@ const obtenerConvocatoriaPorId = async (req, res) => {
   }
 };
 
+const cloudinary = require('../config/cloudinary');
+
+const subirReporteTecnico = async (req, res) => {
+  try {
+    const { convocatoriaId } = req.params;
+    const convocatoria = await Convocatoria.findById(convocatoriaId);
+    if (!convocatoria) {
+      return res.status(404).json({ message: 'Convocatoria no encontrada' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: 'Archivo requerido' });
+    }
+    if (convocatoria.reporteTecnico && convocatoria.reporteTecnico.publicId) {
+      try {
+        await cloudinary.uploader.destroy(convocatoria.reporteTecnico.publicId, { resource_type: 'raw' });
+      } catch (e) {
+      }
+    }
+    const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    let uploaded;
+    try {
+      uploaded = await cloudinary.uploader.upload(base64, {
+        folder: `convocatorias/${convocatoriaId}`,
+        resource_type: 'raw',
+      });
+    } catch (e) {
+      return res.status(500).json({ message: 'Error al subir a Cloudinary' });
+    }
+    convocatoria.reporteTecnico = {
+      url: uploaded.secure_url,
+      publicId: uploaded.public_id,
+      uploadedAt: new Date(),
+    };
+    await convocatoria.save();
+    res.json(convocatoria);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al subir reporte técnico', error: error.message });
+  }
+};
+
 // Crear convocatoria simple (sin aprendices)
 const crearConvocatoria = async (req, res) => {
   try {
@@ -393,4 +433,5 @@ module.exports = {
   reabrirConvocatoria,
   actualizarConvocatoria,
   archivarConvocatoria,
+  subirReporteTecnico,
 };
