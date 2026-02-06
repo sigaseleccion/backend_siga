@@ -174,7 +174,7 @@ const eliminarRol = async (req, res) => {
     });
 
     if (usuariosConRol) {
-      return res.status(400).json({
+      return res.status(409).json({
         mensaje:
           "No se puede eliminar el rol porque hay usuarios activos asignados a él",
       });
