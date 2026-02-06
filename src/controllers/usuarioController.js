@@ -98,8 +98,8 @@ const actualizarUsuario = async (req, res) => {
   }
 };
 
-// Eliminar usuario (desactivar)
-const eliminarUsuario = async (req, res) => {
+// Desactivar usuario (soft delete)
+const desactivarUsuario = async (req, res) => {
   try {
     const usuario = await Usuario.findByIdAndUpdate(
       req.params.id,
@@ -113,6 +113,21 @@ const eliminarUsuario = async (req, res) => {
 
     res.json({ message: 'Usuario desactivado exitosamente' });
   } catch (error) {
+    res.status(500).json({ message: 'Error al desactivar usuario', error: error.message });
+  }
+};
+
+// Eliminar usuario permanentemente (hard delete)
+const eliminarUsuario = async (req, res) => {
+  try {
+    const usuario = await Usuario.findByIdAndDelete(req.params.id);
+
+    if (!usuario) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    res.json({ message: 'Usuario eliminado permanentemente' });
+  } catch (error) {
     res.status(500).json({ message: 'Error al eliminar usuario', error: error.message });
   }
 };
@@ -122,5 +137,6 @@ module.exports = {
   obtenerUsuarioPorId,
   crearUsuario,
   actualizarUsuario,
+  desactivarUsuario,
   eliminarUsuario
 };
