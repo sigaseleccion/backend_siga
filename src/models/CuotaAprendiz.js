@@ -12,7 +12,7 @@ const cuotaAprendizSchema = new mongoose.Schema({
   actualizadoPor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Usuario',
-    required: true
+    required: false
   }
 });
 

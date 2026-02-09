@@ -6,11 +6,12 @@ const HistorialAprendiz = require('../models/HistorialAprendiz');
 const obtenerAprendicesSeguimiento = async (req, res) => {
   try {
     const { etapa, busqueda } = req.query;
-    
+
     // Filtro base: solo aprendices seleccionados y no finalizados
     const filtro = {
       estadoConvocatoria: 'seleccionado',
-      etapaActual: { $ne: 'finalizado' }
+      etapaActual: { $in: ['lectiva', 'productiva'] }  // ✅ Solo lectiva y productiva
+      // etapaActual: { $ne: 'finalizado' }
     };
 
     // Filtrar por etapa si se especifica
@@ -35,8 +36,8 @@ const obtenerAprendicesSeguimiento = async (req, res) => {
     const aprendicesConDias = aprendices.map(aprendiz => {
       const hoy = new Date();
       const fechaFin = aprendiz.fechaFinContrato ? new Date(aprendiz.fechaFinContrato) : null;
-      const diasRestantes = fechaFin 
-        ? Math.ceil((fechaFin - hoy) / (1000 * 60 * 60 * 24)) 
+      const diasRestantes = fechaFin
+        ? Math.ceil((fechaFin - hoy) / (1000 * 60 * 60 * 24))
         : null;
 
       return {
@@ -66,10 +67,10 @@ const obtenerEstadisticasSeguimiento = async (req, res) => {
       etapaActual: 'productiva'
     });
 
-    // Obtener total de aprendices activos (no finalizados)
-    const totalActivos = await Aprendiz.countDocuments({
+    // Obtener total de aprendices EN SEGUIMIENTO (solo lectiva + productiva)
+    const totalEnSeguimiento = await Aprendiz.countDocuments({
       estadoConvocatoria: 'seleccionado',
-      etapaActual: { $ne: 'finalizado' }
+      etapaActual: { $in: ['lectiva', 'productiva'] }  // Solo etapas en seguimiento
     });
 
     // Obtener cuota actual
@@ -91,7 +92,7 @@ const obtenerEstadisticasSeguimiento = async (req, res) => {
     res.json({
       enLectiva,
       enProductiva,
-      totalActivos,
+      totalEnSeguimiento,  // Número de aprendices en lectiva + productiva
       cuota,
       aprendicesIncompletos
     });
@@ -211,8 +212,8 @@ const obtenerDetalleAprendizSeguimiento = async (req, res) => {
     // Calcular días restantes
     const hoy = new Date();
     const fechaFin = aprendiz.fechaFinContrato ? new Date(aprendiz.fechaFinContrato) : null;
-    const diasRestantes = fechaFin 
-      ? Math.ceil((fechaFin - hoy) / (1000 * 60 * 60 * 24)) 
+    const diasRestantes = fechaFin
+      ? Math.ceil((fechaFin - hoy) / (1000 * 60 * 60 * 24))
       : null;
 
     res.json({
@@ -224,11 +225,131 @@ const obtenerDetalleAprendizSeguimiento = async (req, res) => {
   }
 };
 
+// Obtener aprendices recomendados para reemplazo
+const obtenerRecomendadosParaReemplazo = async (req, res) => {
+  try {
+    const { fechaFinContrato } = req.query;
+
+    if (!fechaFinContrato) {
+      return res.status(400).json({ message: 'fechaFinContrato es requerida' });
+    }
+
+    const fecha = new Date(fechaFinContrato);
+    const fechaMenos20Dias = new Date(fecha);
+    fechaMenos20Dias.setDate(fechaMenos20Dias.getDate() - 20);
+    const fechaMas20Dias = new Date(fecha);
+    fechaMas20Dias.setDate(fechaMas20Dias.getDate() + 20);
+
+    // Buscar aprendices en lectiva con fechaInicioProductiva cercana a fechaFinContrato
+    const recomendados = await Aprendiz.find({
+      estadoConvocatoria: 'seleccionado',
+      etapaActual: 'lectiva',
+      fechaInicioProductiva: {
+        $gte: fechaMenos20Dias,
+        $lte: fechaMas20Dias
+      }
+    }).select('_id nombre apellido documento tipoDocumento etapaActual fechaInicioProductiva programaFormacion ciudad');
+
+    res.json(recomendados);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener recomendados', error: error.message });
+  }
+};
+
+// Actualizar fechas de aprendiz
+const actualizarFechasAprendiz = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fechaInicioProductiva, fechaFinContrato } = req.body;
+
+    const aprendiz = await Aprendiz.findById(id);
+    if (!aprendiz) {
+      return res.status(404).json({ message: 'Aprendiz no encontrado' });
+    }
+
+    if (fechaInicioProductiva) {
+      aprendiz.fechaInicioProductiva = new Date(fechaInicioProductiva);
+    }
+
+    if (fechaFinContrato) {
+      aprendiz.fechaFinContrato = new Date(fechaFinContrato);
+    }
+
+    await aprendiz.save();
+
+    // Popular referencias para mantener consistencia con GET /api/seguimiento
+    const aprendizActualizado = await Aprendiz.findById(id)
+      .populate('convocatoriaId', 'nombre')
+      .populate('reemplazoId', 'nombre documento');
+
+    res.json({ message: 'Fechas actualizadas correctamente', aprendiz: aprendizActualizado });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al actualizar fechas', error: error.message });
+  }
+};
+
+// Actualizar etapas automáticamente según fechaInicioProductiva
+const actualizarEtapasAutomaticas = async (req, res) => {
+  try {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0); // Resetear a medianoche para comparación exacta
+
+    // Buscar aprendices en etapa lectiva cuya fecha de inicio productiva ya pasó
+    const aprendices = await Aprendiz.find({
+      estadoConvocatoria: 'seleccionado',
+      etapaActual: 'lectiva',
+      fechaInicioProductiva: { $lte: hoy }
+    });
+
+    if (aprendices.length === 0) {
+      return res.json({
+        message: 'No hay aprendices para actualizar',
+        actualizados: 0,
+        detalles: []
+      });
+    }
+
+    // Actualizar cada aprendiz a productiva
+    const actualizados = [];
+    for (const aprendiz of aprendices) {
+      aprendiz.etapaActual = 'productiva';
+      await aprendiz.save();
+
+      actualizados.push({
+        id: aprendiz._id,
+        nombre: aprendiz.nombre,
+        documento: aprendiz.documento,
+        fechaInicioProductiva: aprendiz.fechaInicioProductiva,
+        etapaAnterior: 'lectiva',
+        etapaNueva: 'productiva'
+      });
+
+      // Log de auditoría
+      console.log(`[AUDITORÍA] Aprendiz ${aprendiz.nombre} (${aprendiz.documento}) pasó de lectiva a productiva automáticamente. Fecha inicio productiva: ${aprendiz.fechaInicioProductiva}`);
+    }
+
+    res.json({
+      message: `${actualizados.length} aprendiz(es) actualizado(s) a etapa productiva`,
+      actualizados: actualizados.length,
+      detalles: actualizados
+    });
+  } catch (error) {
+    console.error('[ERROR] Error al actualizar etapas automáticamente:', error);
+    res.status(500).json({
+      message: 'Error al actualizar etapas automáticamente',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   obtenerAprendicesSeguimiento,
   obtenerEstadisticasSeguimiento,
   obtenerAprendicesIncompletos,
   cambiarEtapaAprendiz,
   asignarReemplazo,
-  obtenerDetalleAprendizSeguimiento
+  obtenerDetalleAprendizSeguimiento,
+  obtenerRecomendadosParaReemplazo,
+  actualizarFechasAprendiz,
+  actualizarEtapasAutomaticas
 };
