@@ -55,8 +55,22 @@ const listarRoles = async (req, res) => {
       .populate("permisos.privilegiosAsignados")
       .sort({ nombre: 1 });
 
-    res.json(roles);
+    const rolesConUsuarios = await Promise.all(
+      roles.map(async (rol) => {
+        const usersCount = await Usuario.countDocuments({
+          rol: rol._id,
+        });
+
+        return {
+          ...rol.toObject(),
+          usersCount,
+        };
+      }),
+    );
+
+    res.json(rolesConUsuarios);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ mensaje: "Error al listar roles" });
   }
 };
