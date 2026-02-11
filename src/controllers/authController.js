@@ -65,7 +65,20 @@ const verificarToken = async (req, res) => {
   try {
     const usuario = await Usuario.findById(req.usuario.id)
       .select("-contrasena")
-      .populate("rol");
+      .populate({
+        path: "rol",
+        populate: [
+          {
+            path: "permisos.permiso",
+            select: "modulo",
+          },
+          {
+            path: "permisos.privilegiosAsignados",
+            select: "clave etiqueta",
+          },
+        ],
+      });
+
     res.json(usuario);
   } catch (error) {
     res
