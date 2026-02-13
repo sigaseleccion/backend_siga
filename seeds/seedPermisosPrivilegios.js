@@ -18,7 +18,6 @@ const ejecutarSeedPermisos = async () => {
 
       seleccion: [
         'ver',
-        'crear',
         'editar',
         'gestionReporteTecnico',
         'gestionArchivado'
@@ -26,7 +25,6 @@ const ejecutarSeedPermisos = async () => {
 
       seguimiento: [
         'ver',
-        'crear',
         'editar'
       ],
 
