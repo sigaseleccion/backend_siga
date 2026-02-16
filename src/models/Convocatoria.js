@@ -45,7 +45,9 @@ const convocatoriaSchema = new mongoose.Schema({
   ,
   reporteTecnico: {
     url: { type: String },
+    downloadUrl: { type: String },
     publicId: { type: String },
+    fileName: { type: String },
     uploadedAt: { type: Date }
   }
 });
