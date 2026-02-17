@@ -257,6 +257,49 @@ const obtenerRecomendadosParaReemplazo = async (req, res) => {
   }
 };
 
+// Obtener aprendices recomendados por fecha de inicio de contrato (ventana -20 a +20 días) e incluir coincidencia exacta por inicio productiva
+const obtenerRecomendadosPorContrato = async (req, res) => {
+  try {
+    const { fechaInicioContrato } = req.query;
+    if (!fechaInicioContrato) {
+      return res.status(400).json({ message: 'fechaInicioContrato es requerida' });
+    }
+    const fecha = new Date(fechaInicioContrato);
+    const inicioVentana = new Date(fecha);
+    inicioVentana.setDate(inicioVentana.getDate() - 20);
+    inicioVentana.setHours(0, 0, 0, 0);
+    const finVentana = new Date(fecha);
+    finVentana.setDate(finVentana.getDate() + 20);
+    finVentana.setHours(23, 59, 59, 999);
+    const inicioDia = new Date(fecha);
+    inicioDia.setHours(0, 0, 0, 0);
+    const finDia = new Date(fecha);
+    finDia.setHours(23, 59, 59, 999);
+
+    const recomendados = await Aprendiz.find({
+      estadoConvocatoria: 'seleccionado',
+      etapaActual: 'lectiva',
+      $or: [
+        {
+          fechaInicioContrato: {
+            $gte: inicioVentana,
+            $lte: finVentana
+          }
+        },
+        {
+          fechaInicioProductiva: {
+            $gte: inicioDia,
+            $lte: finDia
+          }
+        }
+      ]
+    }).select('_id nombre documento tipoDocumento etapaActual fechaInicioLectiva fechaFinLectiva fechaInicioProductiva fechaFinProductiva fechaInicioContrato fechaFinContrato programaFormacion ciudad');
+    res.json(recomendados);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener recomendados por contrato', error: error.message });
+  }
+};
+
 // Actualizar fechas de aprendiz
 const actualizarFechasAprendiz = async (req, res) => {
   try {
@@ -459,6 +502,13 @@ const actualizarEtapasAutomaticas = async (req, res) => {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0); // Resetear a medianoche para comparación exacta
 
+    // 0. Buscar aprendices en etapa seleccion2 cuya fecha de inicio de contrato ya pasó
+    const aprendicesSeleccionALectiva = await Aprendiz.find({
+      estadoConvocatoria: 'seleccionado',
+      etapaActual: 'seleccion2',
+      fechaInicioContrato: { $lte: hoy }
+    });
+
     // 1. Buscar aprendices en etapa lectiva cuya fecha de inicio productiva ya pasó
     const aprendicesLectivaAProductiva = await Aprendiz.find({
       estadoConvocatoria: 'seleccionado',
@@ -474,6 +524,21 @@ const actualizarEtapasAutomaticas = async (req, res) => {
     });
 
     const actualizados = [];
+
+    // Actualizar seleccion2 → lectiva
+    for (const aprendiz of aprendicesSeleccionALectiva) {
+      aprendiz.etapaActual = 'lectiva';
+      await aprendiz.save();
+      actualizados.push({
+        id: aprendiz._id,
+        nombre: aprendiz.nombre,
+        documento: aprendiz.documento,
+        fechaInicioContrato: aprendiz.fechaInicioContrato,
+        etapaAnterior: 'seleccion2',
+        etapaNueva: 'lectiva'
+      });
+      console.log(`[AUDITORÍA] Aprendiz ${aprendiz.nombre} (${aprendiz.documento}) pasó de seleccion2 a lectiva automáticamente. Fecha inicio contrato: ${aprendiz.fechaInicioContrato}`);
+    }
 
     // Actualizar lectiva → productiva
     for (const aprendiz of aprendicesLectivaAProductiva) {
@@ -556,6 +621,7 @@ module.exports = {
   asignarReemplazo,
   obtenerDetalleAprendizSeguimiento,
   obtenerRecomendadosParaReemplazo,
+  obtenerRecomendadosPorContrato,
   actualizarFechasAprendiz,
   actualizarEtapasAutomaticas,
   obtenerAprendicesHistorico

@@ -83,6 +83,11 @@ const aprendizSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Aprendiz',
     default: null
+  },
+  apReemplazar: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Aprendiz',
+    default: null
   }
 
 });

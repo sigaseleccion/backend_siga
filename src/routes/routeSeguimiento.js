@@ -12,6 +12,9 @@ router.get('/incompletos', seguimientoController.obtenerAprendicesIncompletos);
 // GET /api/seguimiento/recomendados-reemplazo - Obtener aprendices recomendados para reemplazo
 router.get('/recomendados-reemplazo', seguimientoController.obtenerRecomendadosParaReemplazo);
 
+// GET /api/seguimiento/recomendados-contrato - Obtener recomendados por fecha de inicio de contrato
+router.get('/recomendados-contrato', seguimientoController.obtenerRecomendadosPorContrato);
+
 // GET /api/seguimiento/historico - Obtener aprendices finalizados (histórico)
 router.get('/historico', seguimientoController.obtenerAprendicesHistorico);
 

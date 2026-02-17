@@ -128,7 +128,11 @@ const subirReporteTecnico = async (req, res) => {
       } catch (e) {
       }
     }
+    // Construir archivo base64 desde buffer en memoria (multer memoryStorage)
     const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    // Obtener nombre original para forzar descarga con el mismo nombre en Cloudinary
+    const originalName = (req.file.originalname || 'reporte').trim().replace(/\s+/g, '_');
+    const encodedName = encodeURIComponent(originalName);
     let uploaded;
     try {
       uploaded = await cloudinary.uploader.upload(base64, {
@@ -138,9 +142,19 @@ const subirReporteTecnico = async (req, res) => {
     } catch (e) {
       return res.status(500).json({ message: 'Error al subir a Cloudinary' });
     }
+    // Generar URL de descarga con nombre original usando el SDK (evita errores 400 por orden de segmentos)
+    const attachmentUrl = cloudinary.url(uploaded.public_id, {
+      resource_type: 'raw',
+      type: 'upload',
+      attachment: originalName,
+      secure: true,
+      version: uploaded.version
+    });
     convocatoria.reporteTecnico = {
       url: uploaded.secure_url,
+      downloadUrl: attachmentUrl,
       publicId: uploaded.public_id,
+      fileName: originalName,
       uploadedAt: new Date(),
     };
     await convocatoria.save();
