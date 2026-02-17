@@ -31,6 +31,7 @@ const obtenerAprendicesSeguimiento = async (req, res) => {
     const aprendices = await Aprendiz.find(filtro)
       .populate('convocatoriaId', 'nombre')
       .populate('reemplazoId', 'nombre documento')
+      .populate('apReemplazar', 'nombre documento')  // Aprendiz que este va a reemplazar
       .sort({ nombre: 1 });
 
     // Calcular días restantes para cada aprendiz
@@ -189,7 +190,8 @@ const asignarReemplazo = async (req, res) => {
     await aprendiz.save();
 
     const aprendizActualizado = await Aprendiz.findById(id)
-      .populate('reemplazoId', 'nombre documento');
+      .populate('reemplazoId', 'nombre documento')
+      .populate('apReemplazar', 'nombre documento');
 
     res.json({ message: 'Reemplazo asignado correctamente', aprendiz: aprendizActualizado });
   } catch (error) {
@@ -204,7 +206,8 @@ const obtenerDetalleAprendizSeguimiento = async (req, res) => {
 
     const aprendiz = await Aprendiz.findById(id)
       .populate('convocatoriaId', 'nombre fechaInicio fechaFin')
-      .populate('reemplazoId', 'nombre documento');
+      .populate('reemplazoId', 'nombre documento')
+      .populate('apReemplazar', 'nombre documento');
 
     if (!aprendiz) {
       return res.status(404).json({ message: 'Aprendiz no encontrado' });
@@ -451,7 +454,8 @@ const actualizarFechasAprendiz = async (req, res) => {
     // Popular referencias para mantener consistencia con GET /api/seguimiento
     const aprendizActualizado = await Aprendiz.findById(id)
       .populate('convocatoriaId', 'nombre')
-      .populate('reemplazoId', 'nombre documento');
+      .populate('reemplazoId', 'nombre documento')
+      .populate('apReemplazar', 'nombre documento');
 
     res.json({
       message: mensajeRespuesta,

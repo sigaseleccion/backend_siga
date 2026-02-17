@@ -37,6 +37,29 @@ const crearAprendiz = async (req, res) => {
 // Actualizar aprendiz
 const actualizarAprendiz = async (req, res) => {
   try {
+    const { apReemplazar } = req.body;
+
+    // Si se está actualizando el campo apReemplazar, establecer la relación bidireccional
+    if (apReemplazar !== undefined) {
+      const aprendizActual = await Aprendiz.findById(req.params.id);
+
+      // Si había un reemplazo anterior, limpiar esa relación
+      if (aprendizActual.apReemplazar && aprendizActual.apReemplazar.toString() !== apReemplazar) {
+        await Aprendiz.findByIdAndUpdate(
+          aprendizActual.apReemplazar,
+          { reemplazoId: null }
+        );
+      }
+
+      // Si se está asignando un nuevo reemplazo, actualizar bidireccionalmente
+      if (apReemplazar) {
+        await Aprendiz.findByIdAndUpdate(
+          apReemplazar,
+          { reemplazoId: req.params.id }
+        );
+      }
+    }
+
     const aprendiz = await Aprendiz.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!aprendiz) {
       return res.status(404).json({ message: 'Aprendiz no encontrado' });
