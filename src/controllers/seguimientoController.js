@@ -287,7 +287,7 @@ const obtenerRecomendadosPorContrato = async (req, res) => {
     const finDia = new Date(fecha);
     finDia.setHours(23, 59, 59, 999);
 
-    const recomendados = await Aprendiz.find({
+    let recomendados = await Aprendiz.find({
       estadoConvocatoria: 'seleccionado',
       etapaActual: 'lectiva',
       $or: [
@@ -305,6 +305,15 @@ const obtenerRecomendadosPorContrato = async (req, res) => {
         }
       ]
     }).select('_id nombre documento tipoDocumento etapaActual fechaInicioLectiva fechaFinLectiva fechaInicioProductiva fechaFinProductiva fechaInicioContrato fechaFinContrato programaFormacion ciudad');
+    
+    const ids = recomendados.map(r => r._id);
+    if (ids.length > 0) {
+      const yaAsignados = await Aprendiz.find({ apReemplazar: { $in: ids } }).select('apReemplazar');
+      if (yaAsignados && yaAsignados.length > 0) {
+        const ocupados = new Set(yaAsignados.map(a => String(a.apReemplazar)));
+        recomendados = recomendados.filter(r => !ocupados.has(String(r._id)));
+      }
+    }
     res.json(recomendados);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener recomendados por contrato', error: error.message });
