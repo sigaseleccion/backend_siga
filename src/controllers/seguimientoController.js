@@ -69,10 +69,18 @@ const obtenerEstadisticasSeguimiento = async (req, res) => {
       etapaActual: 'productiva'
     });
 
-    // Obtener total de aprendices EN SEGUIMIENTO (solo lectiva + productiva)
+    // Obtener total de aprendices EN SEGUIMIENTO (lectiva + productiva + seleccion2 aprobados)
+    // seleccion2 aprobados = tienen fechaInicioContrato y fechaFinContrato diligenciadas
     const totalEnSeguimiento = await Aprendiz.countDocuments({
       estadoConvocatoria: 'seleccionado',
-      etapaActual: { $in: ['lectiva', 'productiva'] }  // Solo etapas en seguimiento
+      $or: [
+        { etapaActual: { $in: ['lectiva', 'productiva'] } },
+        {
+          etapaActual: 'seleccion2',
+          fechaInicioContrato: { $ne: null },
+          fechaFinContrato: { $ne: null }
+        }
+      ]
     });
 
     // Obtener cuota actual
@@ -617,6 +625,45 @@ const actualizarEtapasAutomaticas = async (req, res) => {
 };
 
 
+// Obtener detalle de aprendices que componen la cuota (seleccion2 aprobados + lectiva + productiva)
+const obtenerDetalleAprendicesCuota = async (req, res) => {
+  try {
+    const aprendices = await Aprendiz.find({
+      estadoConvocatoria: 'seleccionado',
+      $or: [
+        { etapaActual: { $in: ['lectiva', 'productiva'] } },
+        {
+          etapaActual: 'seleccion2',
+          fechaInicioContrato: { $ne: null },
+          fechaFinContrato: { $ne: null }
+        }
+      ]
+    })
+      .populate('convocatoriaId', 'nombre')
+      .populate('reemplazoId', 'nombre documento')
+      .select('nombre documento tipoDocumento etapaActual programaFormacion ciudad fechaInicioContrato fechaInicioProductiva fechaFinContrato convocatoriaId reemplazoId')
+      .sort({ etapaActual: 1, nombre: 1 });
+
+    const agrupados = {
+      seleccion2: aprendices.filter(a => a.etapaActual === 'seleccion2'),
+      lectiva: aprendices.filter(a => a.etapaActual === 'lectiva'),
+      productiva: aprendices.filter(a => a.etapaActual === 'productiva'),
+    };
+
+    res.json({
+      total: aprendices.length,
+      resumen: {
+        seleccion2: agrupados.seleccion2.length,
+        lectiva: agrupados.lectiva.length,
+        productiva: agrupados.productiva.length,
+      },
+      aprendices: agrupados
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener detalle de cuota', error: error.message });
+  }
+};
+
 module.exports = {
   obtenerAprendicesSeguimiento,
   obtenerEstadisticasSeguimiento,
@@ -628,5 +675,6 @@ module.exports = {
   obtenerRecomendadosPorContrato,
   actualizarFechasAprendiz,
   actualizarEtapasAutomaticas,
-  obtenerAprendicesHistorico
+  obtenerAprendicesHistorico,
+  obtenerDetalleAprendicesCuota
 };

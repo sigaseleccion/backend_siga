@@ -21,6 +21,9 @@ router.get('/historico', seguimientoController.obtenerAprendicesHistorico);
 // POST /api/seguimiento/actualizar-etapas-automaticas - Actualizar etapas según fechaInicioProductiva
 router.post('/actualizar-etapas-automaticas', seguimientoController.actualizarEtapasAutomaticas);
 
+// GET /api/seguimiento/cuota/detalle - Listar aprendices que componen la cuota
+router.get('/cuota/detalle', seguimientoController.obtenerDetalleAprendicesCuota);
+
 // GET /api/seguimiento - Obtener aprendices para seguimiento con filtros
 router.get('/', seguimientoController.obtenerAprendicesSeguimiento);
 
