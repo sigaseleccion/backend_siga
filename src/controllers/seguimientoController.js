@@ -673,6 +673,176 @@ const obtenerDetalleAprendicesCuota = async (req, res) => {
   }
 };
 
+// Obtener aprendices con movimientos en el mes actual (finalizan, pasan a productiva, inician)
+const obtenerAprendicesFinalizanMesActual = async (req, res) => {
+  try {
+    // 1. Obtener primer y último día del mes actual
+    const hoy = new Date();
+    const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    primerDiaMes.setHours(0, 0, 0, 0);
+    
+    const ultimoDiaMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+    ultimoDiaMes.setHours(23, 59, 59, 999);
+
+    // Próximo mes (para fallback)
+    const primerDiaProximoMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+    primerDiaProximoMes.setHours(0, 0, 0, 0);
+    
+    const ultimoDiaProximoMes = new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0);
+    ultimoDiaProximoMes.setHours(23, 59, 59, 999);
+
+    const hoyMidnight = new Date();
+    hoyMidnight.setHours(0, 0, 0, 0);
+
+    // Función helper para procesar aprendices
+    const procesarAprendices = async (primerDia, ultimoDia) => {
+      // CATEGORÍA 1: Aprendices en PRODUCTIVA que finalizan contrato
+      const finalizanProductiva = await Aprendiz.find({
+        estadoConvocatoria: 'seleccionado',
+        etapaActual: 'productiva',
+        fechaFinContrato: {
+          $gte: primerDia,
+          $lte: ultimoDia
+        }
+      })
+        .populate('convocatoriaId', 'nombreConvocatoria')
+        .populate('reemplazoId', 'nombre documento')
+        .select('nombre documento tipoDocumento programaFormacion ciudad fechaFinContrato fechaInicioProductiva etapaActual reemplazoId')
+        .lean();
+
+      // CATEGORÍA 2: Aprendices en LECTIVA que pasan a productiva
+      const pasanProductiva = await Aprendiz.find({
+        estadoConvocatoria: 'seleccionado',
+        etapaActual: 'lectiva',
+        fechaInicioProductiva: {
+          $gte: primerDia,
+          $lte: ultimoDia
+        }
+      })
+        .populate('convocatoriaId', 'nombreConvocatoria')
+        .populate('reemplazoId', 'nombre documento')
+        .select('nombre documento tipoDocumento programaFormacion ciudad fechaInicioProductiva fechaFinLectiva etapaActual reemplazoId')
+        .lean();
+
+      // CATEGORÍA 3: Aprendices en SELECCION2 que inician contrato
+      const inicianContrato = await Aprendiz.find({
+        estadoConvocatoria: 'seleccionado',
+        etapaActual: 'seleccion2',
+        fechaInicioContrato: {
+          $gte: primerDia,
+          $lte: ultimoDia
+        }
+      })
+        .populate('convocatoriaId', 'nombreConvocatoria')
+        .select('nombre documento tipoDocumento programaFormacion ciudad fechaInicioContrato etapaActual')
+        .lean();
+
+      // Procesar categoría 1: Finalizan contrato (productiva)
+      const procesadosFinalizan = finalizanProductiva.map((a) => {
+        const fechaFin = new Date(a.fechaFinContrato);
+        const diasRestantes = Math.ceil((fechaFin - hoyMidnight) / (1000 * 60 * 60 * 24));
+
+        let urgencia = 'normal';
+        if (diasRestantes <= 7) urgencia = 'critico';
+        else if (diasRestantes <= 15) urgencia = 'urgente';
+        else if (diasRestantes <= 30) urgencia = 'proximo';
+
+        return {
+          ...a,
+          diasRestantes,
+          urgencia,
+          tipoMovimiento: 'finaliza',
+          fechaReferencia: a.fechaFinContrato,
+          tieneReemplazo: Boolean(a.reemplazoId)
+        };
+      });
+
+      // Procesar categoría 2: Pasan a productiva (lectiva)
+      const procesadosPasanProductiva = pasanProductiva.map((a) => {
+        const fechaInicio = new Date(a.fechaInicioProductiva);
+        const diasRestantes = Math.ceil((fechaInicio - hoyMidnight) / (1000 * 60 * 60 * 24));
+
+        let urgencia = 'normal';
+        if (diasRestantes <= 7) urgencia = 'critico';
+        else if (diasRestantes <= 15) urgencia = 'urgente';
+        else if (diasRestantes <= 30) urgencia = 'proximo';
+
+        return {
+          ...a,
+          diasRestantes,
+          urgencia,
+          tipoMovimiento: 'pasa_productiva',
+          fechaReferencia: a.fechaInicioProductiva,
+          tieneReemplazo: Boolean(a.reemplazoId)
+        };
+      });
+
+      // Procesar categoría 3: Inician contrato (seleccion2)
+      const procesadosInician = inicianContrato.map((a) => {
+        const fechaInicio = new Date(a.fechaInicioContrato);
+        const diasRestantes = Math.ceil((fechaInicio - hoyMidnight) / (1000 * 60 * 60 * 24));
+
+        let urgencia = 'normal';
+        if (diasRestantes <= 7) urgencia = 'critico';
+        else if (diasRestantes <= 15) urgencia = 'urgente';
+        else if (diasRestantes <= 30) urgencia = 'proximo';
+
+        return {
+          ...a,
+          diasRestantes,
+          urgencia,
+          tipoMovimiento: 'inicia_contrato',
+          fechaReferencia: a.fechaInicioContrato,
+          tieneReemplazo: false
+        };
+      });
+
+      // Combinar todas las categorías
+      const todosAprendices = [
+        ...procesadosFinalizan,
+        ...procesadosPasanProductiva,
+        ...procesadosInician
+      ];
+
+      // Ordenar por días restantes (los más urgentes primero)
+      todosAprendices.sort((a, b) => a.diasRestantes - b.diasRestantes);
+
+      return {
+        aprendices: todosAprendices,
+        finalizan: procesadosFinalizan.length,
+        pasanProductiva: procesadosPasanProductiva.length,
+        inicianContrato: procesadosInician.length
+      };
+    };
+
+    // Procesar mes actual
+    const mesActual = await procesarAprendices(primerDiaMes, ultimoDiaMes);
+    
+    // Procesar próximo mes (para fallback)
+    const proximoMes = await procesarAprendices(primerDiaProximoMes, ultimoDiaProximoMes);
+
+    res.json({
+      total: mesActual.aprendices.length,
+      mes: hoy.toLocaleString('es-ES', { month: 'long', year: 'numeric' }),
+      proximoMes: primerDiaProximoMes.toLocaleString('es-ES', { month: 'long', year: 'numeric' }),
+      resumen: {
+        finalizan: mesActual.finalizan,
+        pasanProductiva: mesActual.pasanProductiva,
+        inicianContrato: mesActual.inicianContrato
+      },
+      aprendices: mesActual.aprendices,
+      aprendicesProximoMes: proximoMes.aprendices,
+      resumenProximoMes: {
+        finalizan: proximoMes.finalizan,
+        pasanProductiva: proximoMes.pasanProductiva,
+        inicianContrato: proximoMes.inicianContrato
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener aprendices con movimientos del mes', error: error.message });
+  }
+};
+
 module.exports = {
   obtenerAprendicesSeguimiento,
   obtenerEstadisticasSeguimiento,
@@ -685,5 +855,6 @@ module.exports = {
   actualizarFechasAprendiz,
   actualizarEtapasAutomaticas,
   obtenerAprendicesHistorico,
-  obtenerDetalleAprendicesCuota
+  obtenerDetalleAprendicesCuota,
+  obtenerAprendicesFinalizanMesActual
 };
