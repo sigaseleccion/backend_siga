@@ -696,10 +696,10 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
 
     // Función helper para procesar aprendices
     const procesarAprendices = async (primerDia, ultimoDia) => {
-      // CATEGORÍA 1: Aprendices en PRODUCTIVA que finalizan contrato
+      // CATEGORÍA 1: Aprendices que finalizan contrato (sin importar etapa actual)
+      // Mostrar todos los seleccionados con fecha de fin en el mes
       const finalizanProductiva = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
-        etapaActual: 'productiva',
         fechaFinContrato: {
           $gte: primerDia,
           $lte: ultimoDia
@@ -710,10 +710,10 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
         .select('nombre documento tipoDocumento programaFormacion ciudad fechaFinContrato fechaInicioProductiva etapaActual reemplazoId')
         .lean();
 
-      // CATEGORÍA 2: Aprendices en LECTIVA que pasan a productiva
+      // CATEGORÍA 2: Aprendices que pasan a productiva (sin importar etapa actual)
+      // Mostrar todos los seleccionados con fecha de inicio productiva en el mes
       const pasanProductiva = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
-        etapaActual: 'lectiva',
         fechaInicioProductiva: {
           $gte: primerDia,
           $lte: ultimoDia
@@ -724,10 +724,10 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
         .select('nombre documento tipoDocumento programaFormacion ciudad fechaInicioProductiva fechaFinLectiva etapaActual reemplazoId')
         .lean();
 
-      // CATEGORÍA 3: Aprendices en SELECCION2 que inician contrato
+      // CATEGORÍA 3: Aprendices que inician contrato (sin importar etapa actual)
+      // Mostrar todos los seleccionados con fecha de inicio contrato en el mes
       const inicianContrato = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
-        etapaActual: 'seleccion2',
         fechaInicioContrato: {
           $gte: primerDia,
           $lte: ultimoDia
@@ -804,8 +804,24 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
         ...procesadosInician
       ];
 
-      // Ordenar por días restantes (los más urgentes primero)
-      todosAprendices.sort((a, b) => a.diasRestantes - b.diasRestantes);
+      // Ordenar con prioridad: primero los próximos a vencer (días >= 0), luego los vencidos (días < 0)
+      todosAprendices.sort((a, b) => {
+        const aDias = a.diasRestantes;
+        const bDias = b.diasRestantes;
+        
+        // Ambos por vencer (positivos)
+        if (aDias >= 0 && bDias >= 0) {
+          return aDias - bDias; // Ascendente: el más cercano primero
+        }
+        
+        // Ambos ya vencidos (negativos)
+        if (aDias < 0 && bDias < 0) {
+          return bDias - aDias; // Descendente: el más reciente primero
+        }
+        
+        // Por vencer tiene prioridad sobre vencido
+        return aDias >= 0 ? -1 : 1;
+      });
 
       return {
         aprendices: todosAprendices,
