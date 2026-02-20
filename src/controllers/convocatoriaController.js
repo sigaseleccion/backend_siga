@@ -1,5 +1,7 @@
 const Convocatoria = require('../models/Convocatoria');
 const Aprendiz = require('../models/Aprendiz');
+const https = require('https');
+const http = require('http');
 
 // Función para calcular el ranking de aprendices
 const calcularRanking = async (aprendices) => {
@@ -138,17 +140,17 @@ const subirReporteTecnico = async (req, res) => {
       uploaded = await cloudinary.uploader.upload(base64, {
         folder: `convocatorias/${convocatoriaId}`,
         resource_type: 'raw',
+        public_id: originalName.replace(/\.[^/.]+$/, ''), // Usar nombre original sin extensión como public_id
       });
     } catch (e) {
       return res.status(500).json({ message: 'Error al subir a Cloudinary' });
     }
-    // Generar URL de descarga con nombre original usando el SDK (evita errores 400 por orden de segmentos)
+    // Generar URL de descarga con nombre original usando fl_attachment
     const attachmentUrl = cloudinary.url(uploaded.public_id, {
       resource_type: 'raw',
       type: 'upload',
-      attachment: originalName,
+      flags: `attachment:${encodedName}`,
       secure: true,
-      version: uploaded.version
     });
     convocatoria.reporteTecnico = {
       url: uploaded.secure_url,
@@ -161,6 +163,37 @@ const subirReporteTecnico = async (req, res) => {
     res.json(convocatoria);
   } catch (error) {
     res.status(500).json({ message: 'Error al subir reporte técnico', error: error.message });
+  }
+};
+
+// Descargar reporte técnico con nombre original
+const descargarReporteTecnico = async (req, res) => {
+  try {
+    const { convocatoriaId } = req.params;
+    const convocatoria = await Convocatoria.findById(convocatoriaId);
+    if (!convocatoria || !convocatoria.reporteTecnico || !convocatoria.reporteTecnico.url) {
+      return res.status(404).json({ message: 'Reporte técnico no encontrado' });
+    }
+
+    const fileUrl = convocatoria.reporteTecnico.url;
+    const fileName = convocatoria.reporteTecnico.fileName || 'reporte';
+
+    // Seleccionar módulo según protocolo
+    const requester = fileUrl.startsWith('https') ? https : http;
+
+    requester.get(fileUrl, (fileRes) => {
+      // Forzar nombre de descarga con header Content-Disposition
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Type', fileRes.headers['content-type'] || 'application/octet-stream');
+      if (fileRes.headers['content-length']) {
+        res.setHeader('Content-Length', fileRes.headers['content-length']);
+      }
+      fileRes.pipe(res);
+    }).on('error', (err) => {
+      res.status(500).json({ message: 'Error al descargar el archivo', error: err.message });
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al descargar reporte técnico', error: error.message });
   }
 };
 
@@ -448,4 +481,5 @@ module.exports = {
   actualizarConvocatoria,
   archivarConvocatoria,
   subirReporteTecnico,
+  descargarReporteTecnico,
 };

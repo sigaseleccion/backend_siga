@@ -16,5 +16,6 @@ router.patch('/:id/cerrar', /*verificarToken*/  convocatoriaController.cerrarCon
 router.patch('/:id/reabrir', /*verificarToken*/  convocatoriaController.reabrirConvocatoria);
 router.patch('/:id/archivar', /*verificarToken*/  convocatoriaController.archivarConvocatoria);
 router.post('/:convocatoriaId/reporte', /*verificarToken*/ upload.single('file'), convocatoriaController.subirReporteTecnico);
+router.get('/:convocatoriaId/reporte/descargar', /*verificarToken*/ convocatoriaController.descargarReporteTecnico);
 
 module.exports = router;
