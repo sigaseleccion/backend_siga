@@ -69,6 +69,14 @@ const obtenerEstadisticasSeguimiento = async (req, res) => {
       etapaActual: 'productiva'
     });
 
+    // Contar aprendices en selección 2 con fechas diligenciadas (próximos a iniciar contrato)
+    const enSeleccion2 = await Aprendiz.countDocuments({
+      estadoConvocatoria: 'seleccionado',
+      etapaActual: 'seleccion2',
+      fechaInicioContrato: { $ne: null },
+      fechaFinContrato: { $ne: null }
+    });
+
     // Obtener total de aprendices EN SEGUIMIENTO (lectiva + productiva + seleccion2 aprobados)
     // seleccion2 aprobados = tienen fechaInicioContrato y fechaFinContrato diligenciadas
     const totalEnSeguimiento = await Aprendiz.countDocuments({
@@ -102,7 +110,8 @@ const obtenerEstadisticasSeguimiento = async (req, res) => {
     res.json({
       enLectiva,
       enProductiva,
-      totalEnSeguimiento,  // Número de aprendices en lectiva + productiva
+      enSeleccion2,
+      totalEnSeguimiento,  // Número de aprendices en lectiva + productiva + seleccion2 con fechas
       cuota,
       aprendicesIncompletos
     });
