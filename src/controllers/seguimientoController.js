@@ -706,9 +706,10 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
     // Función helper para procesar aprendices
     const procesarAprendices = async (primerDia, ultimoDia) => {
       // CATEGORÍA 1: Aprendices que finalizan contrato (sin importar etapa actual)
-      // Mostrar todos los seleccionados con fecha de fin en el mes
+      // Requiere fechaInicioContrato diligenciada para no mostrar registros incompletos
       const finalizanProductiva = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
+        fechaInicioContrato: { $ne: null },
         fechaFinContrato: {
           $gte: primerDia,
           $lte: ultimoDia
@@ -720,9 +721,10 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
         .lean();
 
       // CATEGORÍA 2: Aprendices que pasan a productiva (sin importar etapa actual)
-      // Mostrar todos los seleccionados con fecha de inicio productiva en el mes
+      // Requiere fechaInicioContrato diligenciada para no mostrar registros incompletos
       const pasanProductiva = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
+        fechaInicioContrato: { $ne: null },
         fechaInicioProductiva: {
           $gte: primerDia,
           $lte: ultimoDia
