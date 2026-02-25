@@ -299,7 +299,8 @@ const obtenerRecomendadosPorContrato = async (req, res) => {
       fechaInicioProductiva: {
         $gte: inicioVentana,
         $lte: finVentana
-      }
+      },
+      reemplazoId: null
     }).select('_id nombre documento tipoDocumento etapaActual fechaInicioLectiva fechaFinLectiva fechaInicioProductiva fechaFinProductiva fechaInicioContrato fechaFinContrato programaFormacion ciudad');
     
     const ids = recomendados.map(r => r._id);
@@ -337,7 +338,8 @@ const obtenerReemplazosPorFinContrato = async (req, res) => {
       fechaFinContrato: {
         $gte: inicioVentana,
         $lte: finVentana
-      }
+      },
+      reemplazoId: null
     }).select('_id nombre documento tipoDocumento etapaActual fechaInicioLectiva fechaFinLectiva fechaInicioProductiva fechaFinProductiva fechaInicioContrato fechaFinContrato programaFormacion ciudad');
 
     res.json(recomendados);
