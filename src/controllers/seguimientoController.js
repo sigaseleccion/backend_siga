@@ -256,18 +256,18 @@ const obtenerRecomendadosParaReemplazo = async (req, res) => {
     }
 
     const fecha = new Date(fechaFinContrato);
-    const fechaMenos20Dias = new Date(fecha);
-    fechaMenos20Dias.setDate(fechaMenos20Dias.getDate() - 20);
-    const fechaMas20Dias = new Date(fecha);
-    fechaMas20Dias.setDate(fechaMas20Dias.getDate() + 20);
+    const fechaMenos62Dias = new Date(fecha);
+    fechaMenos62Dias.setDate(fechaMenos62Dias.getDate() - 62);
+    const fechaMas62Dias = new Date(fecha);
+    fechaMas62Dias.setDate(fechaMas62Dias.getDate() + 62);
 
     // Buscar aprendices en lectiva con fechaInicioProductiva cercana a fechaFinContrato
     const recomendados = await Aprendiz.find({
       estadoConvocatoria: 'seleccionado',
       etapaActual: 'lectiva',
       fechaInicioProductiva: {
-        $gte: fechaMenos20Dias,
-        $lte: fechaMas20Dias
+        $gte: fechaMenos62Dias,
+        $lte: fechaMas62Dias
       }
     }).select('_id nombre apellido documento tipoDocumento etapaActual fechaInicioProductiva programaFormacion ciudad');
 
@@ -277,7 +277,7 @@ const obtenerRecomendadosParaReemplazo = async (req, res) => {
   }
 };
 
-// Obtener aprendices recomendados por fecha de inicio de contrato (ventana -20 a +20 días) e incluir coincidencia exacta por inicio productiva
+// Obtener aprendices recomendados por fecha de inicio de contrato (ventana -62 a +62 días) comparando contra inicio de productiva
 const obtenerRecomendadosPorContrato = async (req, res) => {
   try {
     const { fechaInicioContrato } = req.query;
@@ -286,33 +286,20 @@ const obtenerRecomendadosPorContrato = async (req, res) => {
     }
     const fecha = new Date(fechaInicioContrato);
     const inicioVentana = new Date(fecha);
-    inicioVentana.setDate(inicioVentana.getDate() - 20);
+    inicioVentana.setDate(inicioVentana.getDate() - 62);
     inicioVentana.setHours(0, 0, 0, 0);
     const finVentana = new Date(fecha);
-    finVentana.setDate(finVentana.getDate() + 20);
+    finVentana.setDate(finVentana.getDate() + 62);
     finVentana.setHours(23, 59, 59, 999);
-    const inicioDia = new Date(fecha);
-    inicioDia.setHours(0, 0, 0, 0);
-    const finDia = new Date(fecha);
-    finDia.setHours(23, 59, 59, 999);
 
+    // Candidatos en lectiva con inicio de productiva dentro de la ventana definida
     let recomendados = await Aprendiz.find({
       estadoConvocatoria: 'seleccionado',
       etapaActual: 'lectiva',
-      $or: [
-        {
-          fechaInicioContrato: {
-            $gte: inicioVentana,
-            $lte: finVentana
-          }
-        },
-        {
-          fechaInicioProductiva: {
-            $gte: inicioDia,
-            $lte: finDia
-          }
-        }
-      ]
+      fechaInicioProductiva: {
+        $gte: inicioVentana,
+        $lte: finVentana
+      }
     }).select('_id nombre documento tipoDocumento etapaActual fechaInicioLectiva fechaFinLectiva fechaInicioProductiva fechaFinProductiva fechaInicioContrato fechaFinContrato programaFormacion ciudad');
     
     const ids = recomendados.map(r => r._id);
