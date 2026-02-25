@@ -15,6 +15,9 @@ router.get('/recomendados-reemplazo', seguimientoController.obtenerRecomendadosP
 // GET /api/seguimiento/recomendados-contrato - Obtener recomendados por fecha de inicio de contrato
 router.get('/recomendados-contrato', seguimientoController.obtenerRecomendadosPorContrato);
 
+// GET /api/seguimiento/reemplazos-fin-contrato - Candidatos cuyo fin de contrato se alinea a un inicio productiva
+router.get('/reemplazos-fin-contrato', seguimientoController.obtenerReemplazosPorFinContrato);
+
 // GET /api/seguimiento/historico - Obtener aprendices finalizados (histórico)
 router.get('/historico', seguimientoController.obtenerAprendicesHistorico);
 

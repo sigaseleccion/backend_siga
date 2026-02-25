@@ -316,6 +316,36 @@ const obtenerRecomendadosPorContrato = async (req, res) => {
   }
 };
 
+// Obtener candidatos a reemplazar cuyo FIN de contrato se alinee con el INICIO de productiva dado (ventana ±62 días)
+const obtenerReemplazosPorFinContrato = async (req, res) => {
+  try {
+    const { fechaInicioProductiva } = req.query;
+    if (!fechaInicioProductiva) {
+      return res.status(400).json({ message: 'fechaInicioProductiva es requerida' });
+    }
+    const base = new Date(fechaInicioProductiva);
+    const inicioVentana = new Date(base);
+    inicioVentana.setDate(inicioVentana.getDate() - 62);
+    inicioVentana.setHours(0, 0, 0, 0);
+    const finVentana = new Date(base);
+    finVentana.setDate(finVentana.getDate() + 62);
+    finVentana.setHours(23, 59, 59, 999);
+
+    const recomendados = await Aprendiz.find({
+      estadoConvocatoria: 'seleccionado',
+      etapaActual: 'productiva',
+      fechaFinContrato: {
+        $gte: inicioVentana,
+        $lte: finVentana
+      }
+    }).select('_id nombre documento tipoDocumento etapaActual fechaInicioLectiva fechaFinLectiva fechaInicioProductiva fechaFinProductiva fechaInicioContrato fechaFinContrato programaFormacion ciudad');
+
+    res.json(recomendados);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener reemplazos por fin de contrato', error: error.message });
+  }
+};
+
 // Actualizar fechas de aprendiz
 const actualizarFechasAprendiz = async (req, res) => {
   try {
@@ -866,6 +896,7 @@ module.exports = {
   obtenerDetalleAprendizSeguimiento,
   obtenerRecomendadosParaReemplazo,
   obtenerRecomendadosPorContrato,
+  obtenerReemplazosPorFinContrato,
   actualizarFechasAprendiz,
   actualizarEtapasAutomaticas,
   obtenerAprendicesHistorico,
