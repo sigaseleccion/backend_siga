@@ -28,7 +28,7 @@
 // const actualizarCuota = async (req, res) => {
 //   try {
 //     const { cuota, actualizadoPor } = req.body;
-    
+
 //     const nuevaCuota = new CuotaAprendiz({
 //       cuota,
 //       actualizadoPor,
@@ -79,6 +79,15 @@ const obtenerHistorialCuotas = async (req, res) => {
 const actualizarCuota = async (req, res) => {
   try {
     const { cuota, cuotaMaxima, actualizadoPor } = req.body;
+
+    // ── RESTRICCIÓN: solo se puede editar la cuota en los primeros 15 días del mes ──
+    const hoy = new Date();
+    const diaMes = hoy.getDate(); // 1-31
+    if (diaMes > 15) {
+      return res.status(403).json({
+        message: `La cuota solo puede modificarse durante los primeros 15 días del mes. Hoy es día ${diaMes}.`
+      });
+    }
 
     // Aceptar tanto 'cuota' como 'cuotaMaxima' para compatibilidad
     const valorCuota = cuotaMaxima || cuota;
