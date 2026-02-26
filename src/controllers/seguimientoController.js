@@ -3,6 +3,66 @@ const Aprendiz = require('../models/Aprendiz');
 const CuotaAprendiz = require('../models/CuotaAprendiz');
 const HistorialAprendiz = require('../models/HistorialAprendiz');
 
+/**
+ * Calcula el período de cuota actual (del 15 al 15)
+ * @param {Date} fecha - Fecha de referencia (default: hoy)
+ * @returns {Object} { inicio, fin, etiqueta, numero }
+ */
+const calcularPeriodoCuotaActual = (fecha = new Date()) => {
+  const referencia = new Date(fecha);
+  const diaDelMes = referencia.getDate();
+  const mes = referencia.getMonth();
+  const anio = referencia.getFullYear();
+
+  let inicio, fin;
+
+  if (diaDelMes < 15) {
+    // Si estamos antes del día 15, el período va del 15 del mes anterior al 14 del mes actual
+    inicio = new Date(anio, mes - 1, 15, 0, 0, 0, 0);
+    fin = new Date(anio, mes, 14, 23, 59, 59, 999);
+  } else {
+    // Si estamos del 15 en adelante, el período va del 15 de este mes al 14 del mes siguiente
+    inicio = new Date(anio, mes, 15, 0, 0, 0, 0);
+    fin = new Date(anio, mes + 1, 14, 23, 59, 59, 999);
+  }
+
+  // Etiqueta del período (ej: "15 feb - 14 mar")
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const etiqueta = `${inicio.getDate()} ${meses[inicio.getMonth()]} - ${fin.getDate()} ${meses[fin.getMonth()]}`;
+
+  // Número de período para identificación única (ej: "2026-02" si el 15 está en febrero)
+  const numero = diaDelMes < 15 
+    ? `${anio}-${String(mes).padStart(2, '0')}` 
+    : `${anio}-${String(mes + 1).padStart(2, '0')}`;
+
+  return { inicio, fin, etiqueta, numero };
+};
+
+/**
+ * Calcula un período de cuota específico (offset desde el actual)
+ * @param {number} offset - Desplazamiento desde el período actual (0=actual, 1=próximo, -1=anterior)
+ * @returns {Object} { inicio, fin, etiqueta, numero }
+ */
+const calcularPeriodoCuotaConOffset = (offset = 0) => {
+  const hoy = new Date();
+  const periodoActual = calcularPeriodoCuotaActual(hoy);
+  
+  const inicio = new Date(periodoActual.inicio);
+  inicio.setMonth(inicio.getMonth() + offset);
+  
+  const fin = new Date(periodoActual.fin);
+  fin.setMonth(fin.getMonth() + offset);
+
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const etiqueta = `${inicio.getDate()} ${meses[inicio.getMonth()]} - ${fin.getDate()} ${meses[fin.getMonth()]}`;
+  
+  const anio = inicio.getFullYear();
+  const mes = inicio.getMonth();
+  const numero = `${anio}-${String(mes + 1).padStart(2, '0')}`;
+
+  return { inicio, fin, etiqueta, numero };
+};
+
 // Obtener aprendices para seguimiento (solo seleccionados)
 const obtenerAprendicesSeguimiento = async (req, res) => {
   try {
@@ -673,36 +733,26 @@ const obtenerDetalleAprendicesCuota = async (req, res) => {
   }
 };
 
-// Obtener aprendices con movimientos en el mes actual (finalizan, pasan a productiva, inician)
+// Obtener aprendices con movimientos en el PERÍODO ACTUAL (15 al 15)
 const obtenerAprendicesFinalizanMesActual = async (req, res) => {
   try {
-    // 1. Obtener primer y último día del mes actual
-    const hoy = new Date();
-    const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    primerDiaMes.setHours(0, 0, 0, 0);
-    
-    const ultimoDiaMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-    ultimoDiaMes.setHours(23, 59, 59, 999);
-
-    // Próximo mes (para fallback)
-    const primerDiaProximoMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
-    primerDiaProximoMes.setHours(0, 0, 0, 0);
-    
-    const ultimoDiaProximoMes = new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0);
-    ultimoDiaProximoMes.setHours(23, 59, 59, 999);
+    // Calcular período actual y próximos 2 períodos
+    const periodoActual = calcularPeriodoCuotaActual();
+    const periodo1 = calcularPeriodoCuotaConOffset(1);
+    const periodo2 = calcularPeriodoCuotaConOffset(2);
 
     const hoyMidnight = new Date();
     hoyMidnight.setHours(0, 0, 0, 0);
 
-    // Función helper para procesar aprendices
-    const procesarAprendices = async (primerDia, ultimoDia) => {
+    // Función helper para procesar aprendices de un período
+    const procesarAprendicesPeriodo = async (periodo) => {
       // CATEGORÍA 1: Aprendices en PRODUCTIVA que finalizan contrato
       const finalizanProductiva = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
         etapaActual: 'productiva',
         fechaFinContrato: {
-          $gte: primerDia,
-          $lte: ultimoDia
+          $gte: periodo.inicio,
+          $lte: periodo.fin
         }
       })
         .populate('convocatoriaId', 'nombreConvocatoria')
@@ -710,13 +760,13 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
         .select('nombre documento tipoDocumento programaFormacion ciudad fechaFinContrato fechaInicioProductiva etapaActual reemplazoId')
         .lean();
 
-      // CATEGORÍA 2: Aprendices en LECTIVA que pasan a productiva
+      // CATEGORÍA 2: Aprendices que pasaron a productiva en este período
+      // Buscar por fecha de inicio productiva, sin importar etapa actual
       const pasanProductiva = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
-        etapaActual: 'lectiva',
         fechaInicioProductiva: {
-          $gte: primerDia,
-          $lte: ultimoDia
+          $gte: periodo.inicio,
+          $lte: periodo.fin
         }
       })
         .populate('convocatoriaId', 'nombreConvocatoria')
@@ -724,13 +774,13 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
         .select('nombre documento tipoDocumento programaFormacion ciudad fechaInicioProductiva fechaFinLectiva etapaActual reemplazoId')
         .lean();
 
-      // CATEGORÍA 3: Aprendices en SELECCION2 que inician contrato
+      // CATEGORÍA 3: Aprendices que iniciaron contrato en este período
+      // Buscar por fecha de inicio de contrato, sin importar etapa actual
       const inicianContrato = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
-        etapaActual: 'seleccion2',
         fechaInicioContrato: {
-          $gte: primerDia,
-          $lte: ultimoDia
+          $gte: periodo.inicio,
+          $lte: periodo.fin
         }
       })
         .populate('convocatoriaId', 'nombreConvocatoria')
@@ -811,35 +861,182 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
         aprendices: todosAprendices,
         finalizan: procesadosFinalizan.length,
         pasanProductiva: procesadosPasanProductiva.length,
-        inicianContrato: procesadosInician.length
+        inicianContrato: procesadosInician.length,
+        total: todosAprendices.length
       };
     };
 
-    // Procesar mes actual
-    const mesActual = await procesarAprendices(primerDiaMes, ultimoDiaMes);
-    
-    // Procesar próximo mes (para fallback)
-    const proximoMes = await procesarAprendices(primerDiaProximoMes, ultimoDiaProximoMes);
+    // Procesar los 3 períodos
+    const datosActual = await procesarAprendicesPeriodo(periodoActual);
+    const datosPeriodo1 = await procesarAprendicesPeriodo(periodo1);
+    const datosPeriodo2 = await procesarAprendicesPeriodo(periodo2);
 
     res.json({
-      total: mesActual.aprendices.length,
-      mes: hoy.toLocaleString('es-ES', { month: 'long', year: 'numeric' }),
-      proximoMes: primerDiaProximoMes.toLocaleString('es-ES', { month: 'long', year: 'numeric' }),
+      // Período actual
+      total: datosActual.total,
+      periodo: periodoActual.etiqueta,
+      periodoNumero: periodoActual.numero,
       resumen: {
-        finalizan: mesActual.finalizan,
-        pasanProductiva: mesActual.pasanProductiva,
-        inicianContrato: mesActual.inicianContrato
+        finalizan: datosActual.finalizan,
+        pasanProductiva: datosActual.pasanProductiva,
+        inicianContrato: datosActual.inicianContrato
       },
-      aprendices: mesActual.aprendices,
-      aprendicesProximoMes: proximoMes.aprendices,
-      resumenProximoMes: {
-        finalizan: proximoMes.finalizan,
-        pasanProductiva: proximoMes.pasanProductiva,
-        inicianContrato: proximoMes.inicianContrato
+      aprendices: datosActual.aprendices,
+
+      // Período siguiente (próximo)
+      proximoPeriodo: periodo1.etiqueta,
+      proximoPeriodoNumero: periodo1.numero,
+      aprendicesProximoPeriodo: datosPeriodo1.aprendices,
+      resumenProximoPeriodo: {
+        finalizan: datosPeriodo1.finalizan,
+        pasanProductiva: datosPeriodo1.pasanProductiva,
+        inicianContrato: datosPeriodo1.inicianContrato,
+        total: datosPeriodo1.total
+      },
+
+      // Período +2 (para predicciones)
+      periodo2: periodo2.etiqueta,
+      periodo2Numero: periodo2.numero,
+      aprendicesPeriodo2: datosPeriodo2.aprendices,
+      resumenPeriodo2: {
+        finalizan: datosPeriodo2.finalizan,
+        pasanProductiva: datosPeriodo2.pasanProductiva,
+        inicianContrato: datosPeriodo2.inicianContrato,
+        total: datosPeriodo2.total
       }
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener aprendices con movimientos del mes', error: error.message });
+    res.status(500).json({ message: 'Error al obtener aprendices con movimientos del período', error: error.message });
+  }
+};
+
+// Obtener predicciones de cuota para los próximos 2 períodos
+const obtenerPrediccionesCuota = async (req, res) => {
+  try {
+    // Obtener cuota configurada
+    const cuotaDoc = await CuotaAprendiz.findOne().sort({ fechaActualizacion: -1 });
+    const cuotaObjetivo = cuotaDoc ? cuotaDoc.cuota : 150;
+
+    // Obtener total de aprendices activos ACTUALES
+    const totalActivos = await Aprendiz.countDocuments({
+      estadoConvocatoria: 'seleccionado',
+      $or: [
+        { etapaActual: { $in: ['lectiva', 'productiva'] } },
+        {
+          etapaActual: 'seleccion2',
+          fechaInicioContrato: { $ne: null },
+          fechaFinContrato: { $ne: null }
+        }
+      ]
+    });
+
+    // Calcular períodos
+    const periodo1 = calcularPeriodoCuotaConOffset(1);  // Próximo período
+    const periodo2 = calcularPeriodoCuotaConOffset(2);  // Período +2
+
+    // Función para calcular proyección de un período
+    const calcularProyeccion = async (periodo, aprendicesIniciales) => {
+      // Aprendices que SALEN en este período (finalizan contrato)
+      const salenAprendices = await Aprendiz.find({
+        estadoConvocatoria: 'seleccionado',
+        etapaActual: 'productiva',
+        fechaFinContrato: {
+          $gte: periodo.inicio,
+          $lte: periodo.fin
+        }
+      })
+        .populate('convocatoriaId', 'nombreConvocatoria')
+        .populate('reemplazoId', 'nombre documento')
+        .select('nombre documento tipoDocumento programaFormacion ciudad fechaFinContrato etapaActual reemplazoId')
+        .lean();
+
+      // Aprendices que ENTRAN en este período (inician contrato)
+      // Buscar por fecha de inicio de contrato, sin importar etapa actual
+      const entranContratosAprendices = await Aprendiz.find({
+        estadoConvocatoria: 'seleccionado',
+        fechaInicioContrato: {
+          $gte: periodo.inicio,
+          $lte: periodo.fin
+        }
+      })
+        .populate('convocatoriaId', 'nombreConvocatoria')
+        .select('nombre documento tipoDocumento programaFormacion ciudad fechaInicioContrato etapaActual')
+        .lean();
+
+      // Aprendices que pasan a PRODUCTIVA
+      // Buscar por fecha de inicio productiva, sin importar etapa actual
+      const entranProductivaAprendices = await Aprendiz.find({
+        estadoConvocatoria: 'seleccionado',
+        fechaInicioProductiva: {
+          $gte: periodo.inicio,
+          $lte: periodo.fin
+        }
+      })
+        .populate('convocatoriaId', 'nombreConvocatoria')
+        .populate('reemplazoId', 'nombre documento')
+        .select('nombre documento tipoDocumento programaFormacion ciudad fechaInicioProductiva fechaFinLectiva etapaActual reemplazoId')
+        .lean();
+
+      const salen = salenAprendices.length;
+      const entran = entranContratosAprendices.length + entranProductivaAprendices.length;
+
+      // Marcar tipo de movimiento en cada aprendiz
+      const aprendicesSalen = salenAprendices.map(a => ({
+        ...a,
+        tipoMovimiento: 'finaliza',
+        fechaReferencia: a.fechaFinContrato
+      }));
+
+      const aprendicesEntran = [
+        ...entranContratosAprendices.map(a => ({
+          ...a,
+          tipoMovimiento: 'inicia_contrato',
+          fechaReferencia: a.fechaInicioContrato
+        })),
+        ...entranProductivaAprendices.map(a => ({
+          ...a,
+          tipoMovimiento: 'pasa_productiva',
+          fechaReferencia: a.fechaInicioProductiva
+        }))
+      ];
+
+      // Proyección = aprendices iniciales - salen + entran
+      const proyeccion = aprendicesIniciales - salen + entran;
+      const cumpleCuota = proyeccion >= cuotaObjetivo;
+      const diferencia = proyeccion - cuotaObjetivo;
+
+      return {
+        periodo: periodo.etiqueta,
+        periodoNumero: periodo.numero,
+        aprendicesIniciales,
+        salen,
+        entran,
+        proyeccion,
+        cuotaObjetivo,
+        cumpleCuota,
+        diferencia,
+        porcentajeCumplimiento: Math.round((proyeccion / cuotaObjetivo) * 100),
+        aprendicesSalen,
+        aprendicesEntran
+      };
+    };
+
+    // Proyección período 1 (basado en aprendices actuales)
+    const proyeccion1 = await calcularProyeccion(periodo1, totalActivos);
+
+    // Proyección período 2 (basado en proyección del período 1)
+    const proyeccion2 = await calcularProyeccion(periodo2, proyeccion1.proyeccion);
+
+    res.json({
+      cuotaObjetivo,
+      aprendicesActuales: totalActivos,
+      predicciones: [proyeccion1, proyeccion2]
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Error al obtener predicciones de cuota', 
+      error: error.message 
+    });
   }
 };
 
@@ -856,5 +1053,6 @@ module.exports = {
   actualizarEtapasAutomaticas,
   obtenerAprendicesHistorico,
   obtenerDetalleAprendicesCuota,
-  obtenerAprendicesFinalizanMesActual
+  obtenerAprendicesFinalizanMesActual,
+  obtenerPrediccionesCuota
 };

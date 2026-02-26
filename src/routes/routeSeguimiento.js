@@ -21,6 +21,9 @@ router.get('/historico', seguimientoController.obtenerAprendicesHistorico);
 // GET /api/seguimiento/finalizan-mes-actual - Obtener aprendices que finalizan contrato este mes
 router.get('/finalizan-mes-actual', seguimientoController.obtenerAprendicesFinalizanMesActual);
 
+// GET /api/seguimiento/predicciones-cuota - Obtener predicciones de cuota para próximos períodos
+router.get('/predicciones-cuota', seguimientoController.obtenerPrediccionesCuota);
+
 // POST /api/seguimiento/actualizar-etapas-automaticas - Actualizar etapas según fechaInicioProductiva
 router.post('/actualizar-etapas-automaticas', seguimientoController.actualizarEtapasAutomaticas);
 
