@@ -167,13 +167,17 @@ const obtenerEstadisticasSeguimiento = async (req, res) => {
       ]
     });
 
+    // Obtener el período actual de la cuota
+    const periodoActual = calcularPeriodoCuotaActual();
+
     res.json({
       enLectiva,
       enProductiva,
       enSeleccion2,
       totalEnSeguimiento,  // Número de aprendices en lectiva + productiva + seleccion2 con fechas
       cuota,
-      aprendicesIncompletos
+      aprendicesIncompletos,
+      periodoActual: periodoActual.etiqueta  // Agregar período actual (ej: "15 feb - 14 mar")
     });
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener estadísticas', error: error.message });
@@ -772,16 +776,10 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
     const hoyMidnight = new Date();
     hoyMidnight.setHours(0, 0, 0, 0);
 
-<<<<<<< HEAD
     // Función helper para procesar aprendices de un período
     const procesarAprendicesPeriodo = async (periodo) => {
-      // CATEGORÍA 1: Aprendices en PRODUCTIVA que finalizan contrato
-=======
-    // Función helper para procesar aprendices
-    const procesarAprendices = async (primerDia, ultimoDia) => {
       // CATEGORÍA 1: Aprendices que finalizan contrato (sin importar etapa actual)
       // Requiere fechaInicioContrato diligenciada para no mostrar registros incompletos
->>>>>>> b923867a9d0bb09a701903450c3b616e34e21b30
       const finalizanProductiva = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
         fechaInicioContrato: { $ne: null },
@@ -795,18 +793,11 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
         .select('nombre documento tipoDocumento programaFormacion ciudad fechaFinContrato fechaInicioProductiva etapaActual reemplazoId')
         .lean();
 
-<<<<<<< HEAD
-      // CATEGORÍA 2: Aprendices que pasaron a productiva en este período
-      // Buscar por fecha de inicio productiva, sin importar etapa actual
-      const pasanProductiva = await Aprendiz.find({
-        estadoConvocatoria: 'seleccionado',
-=======
       // CATEGORÍA 2: Aprendices que pasan a productiva (sin importar etapa actual)
       // Requiere fechaInicioContrato diligenciada para no mostrar registros incompletos
       const pasanProductiva = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
         fechaInicioContrato: { $ne: null },
->>>>>>> b923867a9d0bb09a701903450c3b616e34e21b30
         fechaInicioProductiva: {
           $gte: periodo.inicio,
           $lte: periodo.fin
@@ -817,13 +808,8 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
         .select('nombre documento tipoDocumento programaFormacion ciudad fechaInicioProductiva fechaFinLectiva etapaActual reemplazoId')
         .lean();
 
-<<<<<<< HEAD
-      // CATEGORÍA 3: Aprendices que iniciaron contrato en este período
-      // Buscar por fecha de inicio de contrato, sin importar etapa actual
-=======
       // CATEGORÍA 3: Aprendices que inician contrato (sin importar etapa actual)
       // Mostrar todos los seleccionados con fecha de inicio contrato en el mes
->>>>>>> b923867a9d0bb09a701903450c3b616e34e21b30
       const inicianContrato = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
         fechaInicioContrato: {
