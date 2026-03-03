@@ -4,6 +4,35 @@ const CuotaAprendiz = require('../models/CuotaAprendiz');
 const HistorialAprendiz = require('../models/HistorialAprendiz');
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * REGLAS DE NEGOCIO PARA CÁLCULO DE CUOTAS
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * 1. PERÍODOS DE CUOTA:
+ *    - Los períodos van del día 15 de un mes al día 15 del mes siguiente
+ *    - Ejemplo: 15 febrero - 15 marzo, 15 marzo - 15 abril, etc.
+ * 
+ * 2. REGLA FUNDAMENTAL - CONTRATADOS EL DÍA 15:
+ *    ⚠️ Si un aprendiz es contratado el día 15, NO cuenta para ese período
+ *    - Contratados del 15-feb al 14-mar → NO cuentan para período (15-feb a 15-mar)
+ *    - Contratados del 15-feb al 14-mar → SÍ cuentan para período (15-mar a 15-abr)
+ *    
+ *    Ejemplo práctico:
+ *    - Aprendiz contratado el 15 de marzo → NO cuenta para cuota (15-mar a 15-abr)
+ *    - Aprendiz contratado el 15 de marzo → SÍ contará para cuota (15-abr a 15-may)
+ * 
+ * 3. CÁLCULO DE CANTIDAD:
+ *    Cantidad = (Activos al inicio del período) - (Salen durante el período)
+ *    - "Activos al inicio" = contratados ANTES del día 15 (< día 15)
+ *    - "Salen durante" = finalizan entre el día 15 inicial y el día 15 final (inclusive)
+ * 
+ * 4. EDICIÓN DE CUOTAS:
+ *    - Solo se pueden crear/editar cuotas para períodos FUTUROS
+ *    - Las cuotas del período actual y pasados son de solo lectura
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
  * Calcula el período de cuota actual (del 15 al 15)
  * @param {Date} fecha - Fecha de referencia (default: hoy)
  * @returns {Object} { inicio, fin, etiqueta, numero }
@@ -18,17 +47,19 @@ const calcularPeriodoCuotaActual = (fecha = new Date()) => {
 
   if (diaDelMes < 15) {
     // Si estamos antes del día 15, el período va del 15 del mes anterior al 15 del mes actual
-    inicio = new Date(anio, mes - 1, 15, 0, 0, 0, 0);
-    fin = new Date(anio, mes, 15, 23, 59, 59, 999);
+    // Usar UTC para coincidir con las fechas guardadas en la BD
+    inicio = new Date(Date.UTC(anio, mes - 1, 15, 0, 0, 0, 0));
+    fin = new Date(Date.UTC(anio, mes, 15, 23, 59, 59, 999));
   } else {
     // Si estamos del 15 en adelante, el período va del 15 de este mes al 15 del mes siguiente
-    inicio = new Date(anio, mes, 15, 0, 0, 0, 0);
-    fin = new Date(anio, mes + 1, 15, 23, 59, 59, 999);
+    // Usar UTC para coincidir con las fechas guardadas en la BD
+    inicio = new Date(Date.UTC(anio, mes, 15, 0, 0, 0, 0));
+    fin = new Date(Date.UTC(anio, mes + 1, 15, 23, 59, 59, 999));
   }
 
   // Etiqueta del período (ej: "15 feb - 15 mar")
   const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  const etiqueta = `${inicio.getDate()} ${meses[inicio.getMonth()]} - ${fin.getDate()} ${meses[fin.getMonth()]}`;
+  const etiqueta = `${inicio.getUTCDate()} ${meses[inicio.getUTCMonth()]} - ${fin.getUTCDate()} ${meses[fin.getUTCMonth()]}`;
 
   // Número de período para identificación única (ej: "2026-02" si el 15 está en febrero)
   const numero = diaDelMes < 15 
@@ -48,19 +79,83 @@ const calcularPeriodoCuotaConOffset = (offset = 0) => {
   const periodoActual = calcularPeriodoCuotaActual(hoy);
   
   const inicio = new Date(periodoActual.inicio);
-  inicio.setMonth(inicio.getMonth() + offset);
+  inicio.setUTCMonth(inicio.getUTCMonth() + offset);
   
   const fin = new Date(periodoActual.fin);
-  fin.setMonth(fin.getMonth() + offset);
+  fin.setUTCMonth(fin.getUTCMonth() + offset);
 
   const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  const etiqueta = `${inicio.getDate()} ${meses[inicio.getMonth()]} - ${fin.getDate()} ${meses[fin.getMonth()]}`;
+  const etiqueta = `${inicio.getUTCDate()} ${meses[inicio.getUTCMonth()]} - ${fin.getUTCDate()} ${meses[fin.getUTCMonth()]}`;
   
-  const anio = inicio.getFullYear();
-  const mes = inicio.getMonth();
+  const anio = inicio.getUTCFullYear();
+  const mes = inicio.getUTCMonth();
   const numero = `${anio}-${String(mes + 1).padStart(2, '0')}`;
 
   return { inicio, fin, etiqueta, numero };
+};
+
+/**
+ * Calcula la cantidad de aprendices para un período específico
+ * REGLA: Aprendices contratados DURANTE el período NO cuentan para ese período, sino para el siguiente
+ * Ejemplo: Contratados del 15-feb al 14-mar → NO cuentan para período (15-feb a 15-mar)
+ *          Contratados del 15-feb al 14-mar → SÍ cuentan para período (15-mar a 15-abr)
+ * @param {Date} fechaInicio - Fecha de inicio del período
+ * @param {Date} fechaFin - Fecha de fin del período
+ * @returns {Promise<number>} Cantidad de aprendices calculada
+ */
+const calcularCantidadAprendicesPorPeriodo = async (fechaInicio, fechaFin) => {
+  try {
+    // Normalizar fechas a medianoche UTC para comparación exacta por día (igual que en modelos)
+    const fechaTemp1 = new Date(fechaInicio);
+    const fechaInicioNormalizada = new Date(Date.UTC(
+      fechaTemp1.getFullYear(), 
+      fechaTemp1.getMonth(), 
+      fechaTemp1.getDate(), 
+      0, 0, 0, 0
+    ));
+    
+    const fechaTemp2 = new Date(fechaFin);
+    const fechaFinNormalizada = new Date(Date.UTC(
+      fechaTemp2.getFullYear(), 
+      fechaTemp2.getMonth(), 
+      fechaTemp2.getDate(), 
+      23, 59, 59, 999
+    ));
+
+    // 1. Aprendices activos AL INICIO del período (iniciaron ANTES del día de inicio)
+    // ⚠️ Si alguien es contratado el día 15, NO cuenta para el período que inicia el 15
+    const activosInicioPeriodo = await Aprendiz.countDocuments({
+      estadoConvocatoria: 'seleccionado',
+      fechaInicioContrato: { 
+        $ne: null,
+        $lt: fechaInicioNormalizada  // Estrictamente ANTES del inicio (excluye el día 15)
+      },
+      $or: [
+        { fechaFinContrato: { $exists: false } },
+        { fechaFinContrato: null },
+        { fechaFinContrato: { $gte: fechaInicioNormalizada } }  // No finalizaron antes del período
+      ]
+    });
+
+    // 2. Los que SALEN durante el período (incluyendo el último día)
+    // ⚠️ REGLA: Los que finalizan el día 15 solo cuentan para el período que TERMINA ese día
+    const salenDurantePeriodo = await Aprendiz.countDocuments({
+      estadoConvocatoria: 'seleccionado',
+      fechaFinContrato: {
+        $ne: null,
+        $gt: fechaInicioNormalizada,   // DESPUÉS del día 15 inicial (excluye el día 15)
+        $lte: fechaFinNormalizada
+      }
+    });
+
+    // 3. Cantidad = activos al inicio - salen durante el período
+    const cantidad = activosInicioPeriodo - salenDurantePeriodo;
+
+    return cantidad;
+  } catch (error) {
+    console.error('Error calculando cantidad de aprendices:', error);
+    return 0;
+  }
 };
 
 // Obtener aprendices para seguimiento (solo seleccionados)
@@ -140,33 +235,12 @@ const obtenerEstadisticasSeguimiento = async (req, res) => {
       fechaFinContrato: { $ne: null }
     });
 
-    // NUEVA LÓGICA: Calcular la cuota REAL del período actual
-    // 1. Aprendices activos AL INICIO del período (iniciaron antes del 15 feb)
-    const activosInicioPeriodo = await Aprendiz.countDocuments({
-      estadoConvocatoria: 'seleccionado',
-      fechaInicioContrato: { 
-        $ne: null,
-        $lt: periodoActual.inicio  // Iniciaron ANTES del período actual
-      },
-      $or: [
-        { fechaFinContrato: { $exists: false } },
-        { fechaFinContrato: null },
-        { fechaFinContrato: { $gte: periodoActual.inicio } }  // No finalizaron antes del período
-      ]
-    });
-
-    // 2. Los que SALEN durante el período actual
-    const salenDurantePeriodo = await Aprendiz.countDocuments({
-      estadoConvocatoria: 'seleccionado',
-      fechaFinContrato: {
-        $ne: null,
-        $gte: periodoActual.inicio,
-        $lte: periodoActual.fin
-      }
-    });
-
-    // 3. Cuota del período = activos al inicio - salen durante el período
-    const totalEnSeguimiento = activosInicioPeriodo - salenDurantePeriodo;
+    // 🔄 Usar la función centralizada para calcular cuota del período actual
+    // Esto asegura que la regla "contratados el día 15 no cuentan para ese período" se aplique consistentemente
+    const totalEnSeguimiento = await calcularCantidadAprendicesPorPeriodo(
+      periodoActual.inicio, 
+      periodoActual.fin
+    );
     
     // Para referencia: total actual sin aplicar lógica de período
     const totalActual = await Aprendiz.countDocuments({
@@ -181,9 +255,29 @@ const obtenerEstadisticasSeguimiento = async (req, res) => {
       ]
     });
 
-    // Obtener cuota objetivo
-    const cuotaDoc = await CuotaAprendiz.findOne().sort({ fechaActualizacion: -1 });
-    const cuota = cuotaDoc ? cuotaDoc.cuota : 0;
+    // Obtener cuota del período actual (solo si las fechas coinciden con HOY)
+    const hoy = new Date();
+    const cuotaDoc = await CuotaAprendiz.findOne({
+      fechaInicial: { $lte: hoy },
+      fechaFinal: { $gte: hoy }
+    }).sort({ fechaActualizacion: -1 });
+
+    // ⚠️ NO usar fallback - solo mostrar cuota si realmente corresponde al período actual
+    // Esto permite crear cuotas futuras sin que se apliquen inmediatamente
+    const cuotaActual = cuotaDoc;  // null si no hay cuota para el período actual
+
+    // Formato esperado por el frontend: { actual, maximo }
+    // Para el período ACTUAL, siempre usar totalEnSeguimiento (cálculo en tiempo real)
+    // El cantidadAprendices de la BD es solo para referencia histórica
+    const cuotaInfo = cuotaActual ? {
+      actual: totalEnSeguimiento,  // 🔄 Siempre usar el cálculo en tiempo real para período actual
+      maximo: cuotaActual.cuota,
+      estado: totalEnSeguimiento >= cuotaActual.cuota ? 'cumple' : 'no cumple',  // Recalcular estado
+      fechaInicial: cuotaActual.fechaInicial,
+      fechaFinal: cuotaActual.fechaFinal,
+      _id: cuotaActual._id,
+      esPeriodoActual: true  // Indica que esta cuota SÍ corresponde al período actual
+    } : null;
 
     // Contar aprendices incompletos (con datos faltantes importantes)
     const aprendicesIncompletos = await Aprendiz.countDocuments({
@@ -197,13 +291,22 @@ const obtenerEstadisticasSeguimiento = async (req, res) => {
       ]
     });
 
+    // Buscar cuotas futuras planificadas (fechaInicial > hoy)
+    const cuotasFuturas = await CuotaAprendiz.find({
+      fechaInicial: { $gt: hoy }
+    })
+    .sort({ fechaInicial: 1 })  // Ordenar por fecha de inicio (más cercanas primero)
+    .limit(3)  // Máximo 3 cuotas futuras
+    .select('fechaInicial fechaFinal cuota cantidadAprendices estado');
+
     res.json({
       enLectiva,
       enProductiva,
       enSeleccion2,
       totalEnSeguimiento,  // Cuota del período actual (inicio - salen)
       totalActual,  // Total sin aplicar lógica de período
-      cuota,
+      cuota: cuotaInfo,  // Cuota del período actual (null si no existe)
+      cuotasFuturas: cuotasFuturas || [],  // Cuotas planificadas para períodos futuros
       aprendicesIncompletos,
       periodoActual: periodoActual.etiqueta  // Período actual (ej: "15 feb - 14 mar")
     });
@@ -808,12 +911,13 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
     const procesarAprendicesPeriodo = async (periodo) => {
       // CATEGORÍA 1: Aprendices que finalizan contrato (sin importar etapa actual)
       // Requiere fechaInicioContrato diligenciada para no mostrar registros incompletos
+      // ⚠️ REGLA: Los que finalizan el día 15 solo cuentan para el período que TERMINA ese día
       const finalizanProductiva = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
         fechaInicioContrato: { $ne: null },
         fechaFinContrato: {
-          $gte: periodo.inicio,
-          $lte: periodo.fin
+          $gt: periodo.inicio,  // DESPUÉS del día 15 inicial (excluye el día 15)
+          $lte: periodo.fin     // Hasta el día 15 final (incluye el día 15)
         }
       })
         .populate('convocatoriaId', 'nombreConvocatoria')
@@ -823,11 +927,12 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
 
       // CATEGORÍA 2: Aprendices que pasan a productiva (sin importar etapa actual)
       // Requiere fechaInicioContrato diligenciada para no mostrar registros incompletos
+      // ⚠️ REGLA: Los que pasan a productiva el día 15 solo aparecen en el período que TERMINA ese día
       const pasanProductiva = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
         fechaInicioContrato: { $ne: null },
         fechaInicioProductiva: {
-          $gte: periodo.inicio,
+          $gt: periodo.inicio,  // DESPUÉS del día 15 inicial (excluye el día 15)
           $lte: periodo.fin
         }
       })
@@ -837,11 +942,12 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
         .lean();
 
       // CATEGORÍA 3: Aprendices que inician contrato (sin importar etapa actual)
-      // Mostrar todos los seleccionados con fecha de inicio contrato en el mes
+      // ℹ️ MOSTRAR todos los que inician durante el período (incluye día 15)
+      // ⚠️ NOTA: Los del día 15 se muestran aquí pero NO cuentan para la cuota de este período
       const inicianContrato = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
         fechaInicioContrato: {
-          $gte: periodo.inicio,
+          $gte: periodo.inicio,  // Desde el día 15 inicial (incluye el día 15)
           $lte: periodo.fin
         }
       })
@@ -991,14 +1097,33 @@ const obtenerAprendicesFinalizanMesActual = async (req, res) => {
 // Obtener predicciones de cuota para los próximos 2 períodos
 const obtenerPrediccionesCuota = async (req, res) => {
   try {
-    // Obtener cuota configurada
-    const cuotaDoc = await CuotaAprendiz.findOne().sort({ fechaActualizacion: -1 });
-    const cuotaObjetivo = cuotaDoc ? cuotaDoc.cuota : 150;
-
     // Calcular períodos
     const periodoActual = calcularPeriodoCuotaActual();  // Período actual
     const periodo1 = calcularPeriodoCuotaConOffset(1);  // Próximo período
     const periodo2 = calcularPeriodoCuotaConOffset(2);  // Período +2
+
+    // Obtener cuotas objetivo específicas de cada período desde la base de datos
+    // Convertir fechas a día completo para comparación flexible
+    const obtenerCuotaPorPeriodo = async (periodo) => {
+      const inicioStr = periodo.inicio.toISOString().split('T')[0]; // YYYY-MM-DD
+      const finStr = periodo.fin.toISOString().split('T')[0];
+      
+      // Buscar cuota que tenga esas fechas (tolerancia de 1 día)
+      const cuota = await CuotaAprendiz.findOne({
+        $expr: {
+          $and: [
+            { $eq: [{ $dateToString: { format: "%Y-%m-%d", date: "$fechaInicial" } }, inicioStr] },
+            { $eq: [{ $dateToString: { format: "%Y-%m-%d", date: "$fechaFinal" } }, finStr] }
+          ]
+        }
+      });
+      
+      return cuota ? cuota.cuota : 150;
+    };
+
+    const cuotaObjetivoActual = await obtenerCuotaPorPeriodo(periodoActual);
+    const cuotaObjetivoPeriodo1 = await obtenerCuotaPorPeriodo(periodo1);
+    const cuotaObjetivoPeriodo2 = await obtenerCuotaPorPeriodo(periodo2);
 
     // Obtener total de aprendices activos AL INICIO DEL PERÍODO ACTUAL
     // Son los que iniciaron contrato ANTES del inicio del período actual
@@ -1018,19 +1143,21 @@ const obtenerPrediccionesCuota = async (req, res) => {
 
     // Calcular movimientos DURANTE el período actual
     // Los que salen DURANTE el período actual
+    // ⚠️ REGLA: Los que finalizan el día 15 solo cuentan para el período que TERMINA ese día
     const salenPeriodoActual = await Aprendiz.countDocuments({
       estadoConvocatoria: 'seleccionado',
       fechaFinContrato: {
-        $gte: periodoActual.inicio,
+        $gt: periodoActual.inicio,   // DESPUÉS del día 15 inicial (excluye el día 15)
         $lte: periodoActual.fin
       }
     });
 
     // Los que entran DURANTE el período actual (inician contrato durante el período)
+    // ℹ️ NOTA: Aquí incluimos el día 15 para mostrar, pero en el cálculo de cuota NO cuentan
     const entranPeriodoActual = await Aprendiz.countDocuments({
       estadoConvocatoria: 'seleccionado',
       fechaInicioContrato: {
-        $gte: periodoActual.inicio,
+        $gte: periodoActual.inicio,  // Desde el día 15 inicial (incluye el día 15)
         $lte: periodoActual.fin
       }
     });
@@ -1043,16 +1170,18 @@ const obtenerPrediccionesCuota = async (req, res) => {
 
     // Función para calcular proyección de un período
     // periodoPrevio: el período anterior para buscar quiénes entraron allí
-    const calcularProyeccion = async (periodo, aprendicesIniciales, periodoPrevio = null) => {
+    // cuotaObjetivo: la cuota objetivo específica de este período
+    const calcularProyeccion = async (periodo, aprendicesIniciales, periodoPrevio = null, cuotaObjetivo = 150) => {
       // Aprendices que SALEN DURANTE este período (finalizan contrato)
       // Estos NO cuentan para la cuota de este período, pero SÍ afectan el siguiente
       // Buscar por fecha fin sin importar etapaActual (puede estar en productiva o ya finalizada)
+      // ⚠️ REGLA: Los que finalizan el día 15 solo cuentan para el período que TERMINA ese día
       const salenAprendices = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
         fechaFinContrato: {
           $ne: null,
-          $gte: periodo.inicio,
-          $lte: periodo.fin
+          $gt: periodo.inicio,   // DESPUÉS del día 15 inicial (excluye el día 15)
+          $lte: periodo.fin      // Hasta el día 15 final (incluye el día 15)
         }
       })
         .populate('convocatoriaId', 'nombreConvocatoria')
@@ -1064,11 +1193,12 @@ const obtenerPrediccionesCuota = async (req, res) => {
       // Son los que iniciaron contrato en el período ANTERIOR
       let aprendicesQueSeSuman = [];
       if (periodoPrevio) {
+        // ℹ️ MOSTRAR todos los que iniciaron en el período previo (incluye día 15)
         aprendicesQueSeSuman = await Aprendiz.find({
           estadoConvocatoria: 'seleccionado',
           fechaInicioContrato: {
             $ne: null,
-            $gte: periodoPrevio.inicio,
+            $gte: periodoPrevio.inicio,  // Desde el día 15 inicial (incluye el día 15)
             $lte: periodoPrevio.fin
           }
         })
@@ -1079,11 +1209,12 @@ const obtenerPrediccionesCuota = async (req, res) => {
 
       // Aprendices que ENTRAN DURANTE este período (para el siguiente)
       // Solo deben ser aprendices que NO estaban en la cuota anterior
+      // ℹ️ MOSTRAR todos los que inician (incluye día 15)
       const entranDurantePeriodoAprendices = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
         fechaInicioContrato: {
           $ne: null,
-          $gte: periodo.inicio,
+          $gte: periodo.inicio,  // Desde el día 15 inicial (incluye el día 15)
           $lte: periodo.fin
         }
       })
@@ -1093,10 +1224,11 @@ const obtenerPrediccionesCuota = async (req, res) => {
 
       // Aprendices que pasan a PRODUCTIVA durante este período (solo para info)
       // Estos YA están contados en la cuota inicial, solo cambian de etapa
+      // ⚠️ REGLA: Los que pasan a productiva el día 15 solo aparecen en el período que TERMINA ese día
       const pasanProductivaAprendices = await Aprendiz.find({
         estadoConvocatoria: 'seleccionado',
         fechaInicioProductiva: {
-          $gte: periodo.inicio,
+          $gt: periodo.inicio,   // DESPUÉS del día 15 inicial (excluye el día 15)
           $lte: periodo.fin
         }
       })
@@ -1169,17 +1301,18 @@ const obtenerPrediccionesCuota = async (req, res) => {
 
     // Proyección período 1 (basado en la cuota ajustada con movimientos del período actual)
     // Los que se suman son los que iniciaron en el período actual
-    const proyeccion1 = await calcularProyeccion(periodo1, cuotaInicialPeriodo1, periodoActual);
+    const proyeccion1 = await calcularProyeccion(periodo1, cuotaInicialPeriodo1, periodoActual, cuotaObjetivoPeriodo1);
 
     // Proyección período 2 (basado en proyección del siguiente del período 1)
     // Los que se suman son los que iniciaron en el período 1
-    const proyeccion2 = await calcularProyeccion(periodo2, proyeccion1.proyeccionSiguiente, periodo1);
+    const proyeccion2 = await calcularProyeccion(periodo2, proyeccion1.proyeccionSiguiente, periodo1, cuotaObjetivoPeriodo2);
 
     // Obtener detalles de los movimientos del período actual para mostrarlos
+    // ℹ️ MOSTRAR todos los que inician durante el período (incluye día 15)
     const entranPeriodoActualDetalle = await Aprendiz.find({
       estadoConvocatoria: 'seleccionado',
       fechaInicioContrato: {
-        $gte: periodoActual.inicio,
+        $gte: periodoActual.inicio,  // Desde el día 15 inicial (incluye el día 15)
         $lte: periodoActual.fin
       }
     })
@@ -1187,11 +1320,12 @@ const obtenerPrediccionesCuota = async (req, res) => {
       .select('nombre documento tipoDocumento programaFormacion ciudad fechaInicioContrato etapaActual')
       .lean();
 
+    // ⚠️ REGLA: Los que finalizan el día 15 solo cuentan para el período que TERMINA ese día
     const salenPeriodoActualDetalle = await Aprendiz.find({
       estadoConvocatoria: 'seleccionado',
       fechaFinContrato: {
-        $gte: periodoActual.inicio,
-        $lte: periodoActual.fin
+        $gt: periodoActual.inicio,   // DESPUÉS del día 15 inicial (excluye el día 15)
+        $lte: periodoActual.fin      // Hasta el día 15 final (incluye el día 15)
       }
     })
       .populate('convocatoriaId', 'nombreConvocatoria')
@@ -1200,7 +1334,7 @@ const obtenerPrediccionesCuota = async (req, res) => {
       .lean();
 
     res.json({
-      cuotaObjetivo,
+      cuotaObjetivo: cuotaObjetivoActual,  // Cuota objetivo del período actual
       aprendicesActuales: cuotaActual,  // Cuota del período actual (inicio - salen)
       periodoActual: {
         periodo: periodoActual.etiqueta,
@@ -1242,5 +1376,6 @@ module.exports = {
   obtenerAprendicesHistorico,
   obtenerDetalleAprendicesCuota,
   obtenerAprendicesFinalizanMesActual,
-  obtenerPrediccionesCuota
+  obtenerPrediccionesCuota,
+  calcularCantidadAprendicesPorPeriodo  // ✨ Nueva función exportada
 };

@@ -92,4 +92,36 @@ const aprendizSchema = new mongoose.Schema({
 
 });
 
+// Middleware pre-save: Normalizar fechas de contrato manteniendo el día exacto
+// Previene problemas de timezone que desfasan las fechas en ±1 día
+aprendizSchema.pre('save', function(next) {
+  // Normalizar fechaInicioContrato a medianoche del día exacto (sin conversión de timezone)
+  if (this.fechaInicioContrato && this.isModified('fechaInicioContrato')) {
+    const fecha = new Date(this.fechaInicioContrato);
+    // Crear fecha UTC con el mismo día/mes/año para evitar desfases
+    const fechaNormalizada = new Date(Date.UTC(
+      fecha.getFullYear(), 
+      fecha.getMonth(), 
+      fecha.getDate(), 
+      0, 0, 0, 0
+    ));
+    this.fechaInicioContrato = fechaNormalizada;
+  }
+
+  // Normalizar fechaFinContrato a último segundo del día exacto
+  if (this.fechaFinContrato && this.isModified('fechaFinContrato')) {
+    const fecha = new Date(this.fechaFinContrato);
+    // Crear fecha UTC con el mismo día/mes/año para evitar desfases
+    const fechaNormalizada = new Date(Date.UTC(
+      fecha.getFullYear(), 
+      fecha.getMonth(), 
+      fecha.getDate(), 
+      23, 59, 59, 999
+    ));
+    this.fechaFinContrato = fechaNormalizada;
+  }
+
+  next();
+});
+
 module.exports = mongoose.model('Aprendiz', aprendizSchema);
