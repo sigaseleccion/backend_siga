@@ -54,19 +54,18 @@ const obtenerAprendicesRecomendados = async (fechaInicioProductiva) => {
   if (!fechaInicioProductiva) return [];
   
   const fecha = new Date(fechaInicioProductiva);
-  const fechaMenos10Dias = new Date(fecha);
-  fechaMenos10Dias.setDate(fechaMenos10Dias.getDate() - 10);
-  const fechaMas10Dias = new Date(fecha);
-  fechaMas10Dias.setDate(fechaMas10Dias.getDate() + 10);
+  const fechaMenos15Dias = new Date(fecha);
+  fechaMenos15Dias.setDate(fechaMenos15Dias.getDate() - 15);
+  const fechaMas15Dias = new Date(fecha);
+  fechaMas15Dias.setDate(fechaMas15Dias.getDate() + 15);
   
-  // Buscar aprendices en etapa lectiva con fecha inicio productiva a menos de 10 días de diferencia
   const recomendados = await Aprendiz.find({
     etapaActual: 'lectiva',
-    fechaInicioProductiva: {
-      $gte: fechaMenos10Dias,
-      $lte: fechaMas10Dias
+    fechaFinProductiva: {           // ← ahora compara contra fechaFinProductiva del existente
+      $gte: fechaMenos15Dias,
+      $lte: fechaMas15Dias
     }
-  }).select('_id nombre tipoDocumento documento etapaActual fechaInicioProductiva');
+  }).select('_id nombre tipoDocumento documento etapaActual fechaFinProductiva');
   
   return recomendados.map(a => a._id);
 };
